@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.GuiderMonitorDao">
+	<insert id="insert" parameterType="java.util.HashMap">
+		INSERT INTO MAS_QUEUE_BUSI_INFO(
+			SEQ_NO,
+			TICKET_INFO,
+			BRANCH_NO,
+			SORT_NO,
+			PRIVILEGE_FLAG,
+            QUEUE_STATUS,
+            RESERVE_FLAG,
+            EVALUATE,
+            RECEIVE_FLAG,
+            PARENT_QUEUE_FLAG,
+            QUEUE_FLAG,
+            APPLY_BRANCH_NO,
+            APPLY_DATE,
+            APPLY_TIME,
+            CALL_TIME,
+            FINISH_TIME,
+            WAIT_TIME,
+            HANDLE_TIME,
+            WINDOW_NO,
+            USER_ID,
+            HANDLE_CITY,
+            HANDLE_PROVINCE,
+            HANDLE_COUNTY,
+            CUSTOMER_ID,
+            CUSTOMER_TYPE,
+            CUSTOMER_CLASS,
+            CUSTOMER_LEVEL,
+            EVALUATE_FLAG,
+            VALID_FLAG
+		) VALUES (
+			#{SEQ_NO},
+			#{TICKET_INFO},
+			#{BRANCH_NO},
+			#{SORT_NO},
+			#{PRIVILEGE_FLAG,jdbcType=VARCHAR},
+            #{QUEUE_STATUS,jdbcType=VARCHAR},
+            #{RESERVE_FLAG,jdbcType=VARCHAR},
+            #{EVALUATE,jdbcType=VARCHAR},
+            #{RECEIVE_FLAG,jdbcType=VARCHAR},
+            #{PARENT_QUEUE_FLAG,jdbcType=VARCHAR},
+            #{QUEUE_FLAG,jdbcType=VARCHAR},
+            #{APPLY_BRANCH_NO,jdbcType=VARCHAR},
+            #{APPLY_DATE,jdbcType=VARCHAR},
+            #{APPLY_TIME,jdbcType=VARCHAR},
+            #{CALL_TIME,jdbcType=VARCHAR},
+            #{FINISH_TIME,jdbcType=VARCHAR},
+            #{WAIT_TIME,jdbcType=VARCHAR},
+            #{HANDLE_TIME,jdbcType=VARCHAR},
+            #{WINDOW_NO,jdbcType=VARCHAR},
+            #{USER_ID,jdbcType=VARCHAR},
+            #{HANDLE_CITY,jdbcType=VARCHAR},
+            #{HANDLE_PROVINCE,jdbcType=VARCHAR},
+            #{HANDLE_COUNTY,jdbcType=VARCHAR},
+            #{CUSTOMER_ID,jdbcType=VARCHAR},
+            #{CUSTOMER_TYPE,jdbcType=VARCHAR},
+            #{CUSTOMER_CLASS,jdbcType=VARCHAR},
+            #{CUSTOMER_LEVEL,jdbcType=VARCHAR},
+            #{EVALUATE_FLAG,jdbcType=VARCHAR},
+            #{VALID_FLAG,jdbcType=VARCHAR}
+		)
+	</insert>
+	<update id="update" parameterType="java.util.HashMap">
+		UPDATE MAS_QUEUE_BUSI_INFO
+		<set>
+			<if test="PRIVILEGE_FLAG!=null">PRIVILEGE_FLAG=#{PRIVILEGE_FLAG},</if>
+			<if test="QUEUE_STATUS!=null">QUEUE_STATUS=#{QUEUE_STATUS},</if>
+			<if test="RESERVE_FLAG!=null">RESERVE_FLAG=#{RESERVE_FLAG},</if>
+			<if test="EVALUATE!=null">EVALUATE=#{EVALUATE},</if>
+			<if test="RECEIVE_FLAG!=null">RECEIVE_FLAG=#{RECEIVE_FLAG},</if>
+			<if test="PARENT_QUEUE_FLAG!=null">PARENT_QUEUE_FLAG=#{PARENT_QUEUE_FLAG},</if>
+			<if test="QUEUE_FLAG!=null">QUEUE_FLAG=#{QUEUE_FLAG},</if>
+			<if test="APPLY_BRANCH_NO!=null">APPLY_BRANCH_NO=#{APPLY_BRANCH_NO},</if>
+			<if test="APPLY_DATE!=null">APPLY_DATE=#{APPLY_DATE},</if>
+			<if test="APPLY_TIME!=null">APPLY_TIME=#{APPLY_TIME},</if>
+			<if test="CALL_TIME!=null">CALL_TIME=#{CALL_TIME},</if>
+			<if test="FINISH_TIME!=null">FINISH_TIME=#{FINISH_TIME},</if>
+			<if test="WAIT_TIME!=null">WAIT_TIME=#{WAIT_TIME},</if>
+			<if test="HANDLE_TIME!=null">HANDLE_TIME=#{HANDLE_TIME},</if>
+			<if test="WINDOW_NO!=null">WINDOW_NO=#{WINDOW_NO},</if>
+			<if test="USER_ID!=null">USER_ID=#{USER_ID},</if>
+			<if test="HANDLE_CITY!=null">HANDLE_CITY=#{HANDLE_CITY},</if>
+			<if test="HANDLE_PROVINCE!=null">HANDLE_PROVINCE=#{HANDLE_PROVINCE},</if>
+			<if test="HANDLE_COUNTY!=null">HANDLE_COUNTY=#{HANDLE_COUNTY},</if>
+			<if test="CUSTOMER_ID!=null">CUSTOMER_ID=#{CUSTOMER_ID},</if>
+			<if test="CUSTOMER_TYPE!=null">CUSTOMER_TYPE=#{CUSTOMER_TYPE},</if>
+			<if test="CUSTOMER_CLASS!=null">CUSTOMER_CLASS=#{CUSTOMER_CLASS},</if>
+			<if test="CUSTOMER_LEVEL!=null">CUSTOMER_LEVEL=#{CUSTOMER_LEVEL},</if>
+			<if test="EVALUATE_FLAG!=null">EVALUATE_FLAG=#{EVALUATE_FLAG},</if>
+			<if test="VALID_FLAG!=null">VALID_FLAG=#{VALID_FLAG},</if>
+
+		</set>
+		WHERE SEQ_NO=#{SEQ_NO}
+	</update>
+
+	<delete id="clearData">
+		TRUNCATE TABLE MAS_QUEUE_BUSI_INFO
+	</delete>
+
+</mapper>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.LogDao">
+	<insert id="insertTranInfo" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="KEY_ID" order="BEFORE">
+			select
+			lpad(MAS_TRAN_LOGS_RECORDS_SEQ.nextval, 30, '0') as
+			KEY_ID From DUAL
+		</selectKey>
+		INSERT INTO MAS_TRAN_LOGS_RECORDS(
+			KEY_ID,
+			CONVERSATIONID,
+			BRANCH_NO,
+			BRANCH_NAME,
+			MAC,
+			MID,
+			MNAME,
+			MMODELKEY,
+			MCLASSKEY,
+			MCLASSNAME,
+			MANUF_ID,
+			MANUF_NAME,
+			TRAN_CODE,
+			TRAN_NAME,
+			START_DATE,
+			START_TIME
+		) VALUES (
+			#{KEY_ID, jdbcType=VARCHAR},
+			#{CONVERSATIONID, jdbcType=VARCHAR},
+			#{BRANCH_NO, jdbcType=VARCHAR},
+			#{BRANCH_NAME, jdbcType=VARCHAR},
+			#{MAC, jdbcType=VARCHAR},
+			#{MID, jdbcType=VARCHAR},
+			#{MNAME, jdbcType=VARCHAR},
+			#{MMODELKEY, jdbcType=VARCHAR},
+			#{MCLASSKEY, jdbcType=VARCHAR},
+			#{MCLASSNAME, jdbcType=VARCHAR},
+			#{MANUF_ID, jdbcType=VARCHAR},
+			#{MANUF_NAME, jdbcType=VARCHAR},
+			#{TRAN_CODE, jdbcType=VARCHAR},
+			#{TRAN_NAME, jdbcType=VARCHAR},
+			#{LOG_DATE, jdbcType=VARCHAR},
+			#{LOG_TIME, jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<update id="updateTranInfo" parameterType="java.util.HashMap">
+		UPDATE MAS_TRAN_LOGS_RECORDS
+		<set>
+			<if test="LOG_DATE != null">END_DATE=#{LOG_DATE},</if>
+			<if test="LOG_TIME != null">END_TIME=#{LOG_TIME},</if>
+			<if test="TIME_CONSUMED != null">HANDLE_TIME=#{TIME_CONSUMED},</if>
+		</set>
+		WHERE CONVERSATIONID=#{CONVERSATIONID} AND MID=#{MID}
+	</update>
+
+	<insert id="insertDeviceInfo" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="KEY_ID" order="BEFORE">
+			select
+			lpad(MAS_DEVICE_LOG_RECORDS_SEQ.nextval, 30, '0') as
+			KEY_ID From DUAL
+		</selectKey>
+		INSERT INTO MAS_DEVICE_LOG_RECORDS(
+			KEY_ID,
+			MID,
+			CONVERSATIONID,
+			DEVICE_ID,
+			FUNCTION_NAME,
+			END_DATE,
+			END_TIME,
+			HANDLE_TIME
+		) VALUES (
+			#{KEY_ID},
+			#{MID, jdbcType=VARCHAR},
+			#{CONVERSATIONID, jdbcType=VARCHAR},
+			#{DEVICE_ID, jdbcType=VARCHAR},
+			#{FUNCTION_NAME, jdbcType=VARCHAR},
+			#{LOG_DATE, jdbcType=VARCHAR},
+			#{LOG_TIME, jdbcType=VARCHAR},
+			#{TIME_CONSUMED}
+		)
+	</insert>
+
+	<insert id="insertVTMDeviceInfo" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="KEY_ID" order="BEFORE">
+			select
+			lpad(MAS_DEVICE_LOG_RECORDS_SEQ.nextval, 30, '0') as
+			KEY_ID From DUAL
+		</selectKey>
+		INSERT INTO MAS_DEVICE_LOG_RECORDS(
+			KEY_ID,
+			MID,
+			CONVERSATIONID,
+			DEVICE_ID,
+			FUNCTION_NAME,
+			START_DATE,
+			START_TIME,
+			HANDLE_TIME
+		) VALUES (
+			#{KEY_ID},
+			#{MID, jdbcType=VARCHAR},
+			#{CONVERSATIONID, jdbcType=VARCHAR},
+			#{DEVICE_ID, jdbcType=VARCHAR},
+			#{FUNCTION_NAME, jdbcType=VARCHAR},
+			#{LOG_DATE, jdbcType=VARCHAR},
+			#{LOG_TIME, jdbcType=VARCHAR},
+			#{TIME_FINISHED}
+		)
+	</insert>
+
+	<update id="updateVTMDeviceInfo" parameterType="java.util.HashMap">
+		UPDATE MAS_DEVICE_LOG_RECORDS
+		<set>
+			<if test="LOG_DATE != null">END_DATE=#{LOG_DATE},</if>
+			<if test="LOG_TIME != null">END_TIME=#{LOG_TIME},</if>
+			<if test="TIME_FINISHED != null">HANDLE_TIME= #{TIME_FINISHED} - HANDLE_TIME,</if>
+		</set>
+		WHERE  KEY_ID = (SELECT KEY_ID FROM
+		(SELECT KEY_ID,ROW_NUMBER()OVER(PARTITION BY MID,CONVERSATIONID,DEVICE_ID,FUNCTION_NAME ORDER BY START_TIME DESC NULLS LAST) TT
+		FROM MAS_DEVICE_LOG_RECORDS
+		where MID=#{MID, jdbcType=VARCHAR}
+		AND CONVERSATIONID=#{CONVERSATIONID, jdbcType=VARCHAR}
+		AND DEVICE_ID=#{DEVICE_ID, jdbcType=VARCHAR}
+		AND END_TIME IS NULL
+		AND FUNCTION_NAME=#{FUNCTION_NAME, jdbcType=VARCHAR}
+		AND START_TIME &lt; #{LOG_TIME, jdbcType=VARCHAR})
+		WHERE TT = 1)
+	</update>
+
+
+	<insert id="insertServiceInfo" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="KEY_ID" order="BEFORE">
+			select
+			lpad(MAS_SERVICE_LOG_RECORDS_SEQ.nextval, 30, '0') as
+			KEY_ID From DUAL
+		</selectKey>
+		INSERT INTO MAS_SERVICE_LOG_RECORDS(
+			KEY_ID,
+			MID,
+			CONVERSATIONID,
+			SERVICE_CODE,
+			MESSAGE_TYPE,
+			MESSAGE_CODE,
+			SERVICE_TYPE,
+			END_DATE,
+			END_TIME,
+			HANDLE_TIME
+		) VALUES (
+			#{KEY_ID},
+			#{MID, jdbcType=VARCHAR},
+			#{CONVERSATIONID, jdbcType=VARCHAR},
+			#{SERVICE_CODE, jdbcType=VARCHAR},
+			#{MESSAGE_TYPE, jdbcType=VARCHAR},
+			#{MESSAGE_CODE, jdbcType=VARCHAR},
+			#{SERVICE_TYPE, jdbcType=VARCHAR},
+			#{LOG_DATE, jdbcType=VARCHAR},
+			#{LOG_TIME, jdbcType=VARCHAR},
+			#{TIME_CONSUMED}
+		)
+	</insert>
+
+	<update id="updateServiceInfo" parameterType="java.util.HashMap">
+		UPDATE MAS_SERVICE_LOG_RECORDS
+		<set>
+			<if test="LOG_DATE != null">END_DATE=#{LOG_DATE},</if>
+			<if test="LOG_TIME != null">END_TIME=#{LOG_TIME},</if>
+			<if test="TIME_CONSUMED != null">HANDLE_TIME= #{TIME_CONSUMED},</if>
+			<if test="SERVICE_TYPE != null">SERVICE_TYPE= #{SERVICE_TYPE},</if>
+		</set>
+		WHERE KEY_ID=#{KEY_ID}
+	</update>
+
+	<select id="getTotalInfo" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+		SELECT count(*) FROM MAS_TRAN_LOGS_RECORDS WHERE MAC=#{MAC} AND CONVERSATIONID = #{CONVERSATIONID}
+	</select>
+
+
+</mapper>

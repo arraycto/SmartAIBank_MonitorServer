@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.QueueCustDao">
+    <!--日月季年补零select片段-->
+    <sql id="selectByZero">
+      SELECT time,
+       VALUE,
+       totalAvg,
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (VALUE, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.VALUE, 0) AS VALUE,
+           b.totalAvg AS totalAvg,
+           b.rate AS rate
+        FROM
+    </sql>
+    <sql id="selectCustTypeByZero">
+      SELECT time,
+       VALUE,
+       totalAvg,
+       name,
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (VALUE, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.VALUE, 0) AS VALUE,
+           b.totalAvg AS totalAvg,
+           b.rate AS rate,
+           NVL (b.name, case when #{CUSTOMER_TYPE} = 'C' THEN '对公'
+                             when #{CUSTOMER_TYPE} = 'P' THEN '对私普通'
+                             when #{CUSTOMER_TYPE} = 'V' THEN '对私VIP'
+                             ELSE '未定义' END) AS name
+        FROM
+    </sql>
+    <sql id="selectForCompletionData">
+        <if test=" DATE_TYPE == 'day'">
+			(SELECT TO_CHAR (TO_DATE (SUBSTR(#{TIME_VALUE}, 10), 'yyyyMMDD') -
+			(to_date( SUBSTR(#{TIME_VALUE}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{TIME_VALUE}, 1 ,8), 'yyyyMMDD' )+2)+ ROWNUM,
+			'yyyyMMDD')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= to_date( SUBSTR(#{TIME_VALUE}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{TIME_VALUE}, 1 , 8), 'yyyyMMDD' )+2) a
+        </if>
+        <if test=" DATE_TYPE == 'month'">
+            (SELECT TO_CHAR (
+            ADD_MONTHS (ADD_MONTHS (TO_DATE (#{TIME_VALUE}, 'yyyyMM'), -1 * 13),
+            ROWNUM),
+            'yyyyMM')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 13) a
+        </if>
+        <if test=" DATE_TYPE == 'quarter'">
+            (SELECT TO_CHAR (
+            ADD_MONTHS (ADD_MONTHS (TO_DATE (#{TIME_VALUE}, 'yyyyMM'), -1 * 15),
+            3 * ROWNUM),
+            'yyyyMM')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 5) a
+        </if>
+        <if test=" DATE_TYPE == 'year'">
+            (SELECT TO_CHAR (#{TIME_VALUE} - 4 + ROWNUM)
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 4) a
+        </if>
+    </sql>
+    <!--日月季年重复使用可回滚前片段-->
+    <sql id="sqlByZeroBefore">
+        left join (
+    </sql>
+    <!--日月季年重复使用可回滚后片段-->
+    <sql id="sqlByZeroAfter">
+        ) b
+    </sql>
+    <!--日月季年补零where片段-->
+    <sql id="whereByLeftJoin">
+        ON a.timelist = b.TIME
+            ORDER BY
+        a.timelist)
+    </sql>
+    <sql id="_unio_where">
+        <if test="BRANCH_STATS_TYPE == 1">
+            AND 1!=1
+        </if>
+    </sql>
+    <sql id="_branchStatsType_where">
+        <if test="BRANCH_STATS_TYPE!=0">
+            AND t.BRANCH_STATS_TYPE = #{BRANCH_STATS_TYPE}
+        </if>
+    </sql>
+    <select id="getAvgUnitNo" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        SELECT distinct NVL(ROUND(WAIT_TIME_T_AVG,2),0) as totalAvg
+        <if test="DATE_TYPE == 'day' ">
+            FROM SB_STATS_GATHER_D T
+			WHERE T.TRADE_DATE = to_number(SUBSTR(#{TIME_VALUE}, 10))
+        </if>
+        <if test="DATE_TYPE == 'month' ">
+            FROM SB_STATS_GATHER_M T            WHERE T.TRADE_YM = #{TIME_VALUE}
+        </if>
+        <if test="DATE_TYPE == 'quarter' ">
+            FROM SB_STATS_GATHER_Q T            WHERE T.TRADE_QUARTER = #{TIME_VALUE}
+        </if>
+        <if test="DATE_TYPE == 'year' ">
+            FROM SB_STATS_GATHER_Y T            WHERE T.TRADE_YEAR = #{TIME_VALUE}
+        </if>
+        <choose>
+            <when test="BRANCH_STATS_TYPE==1">
+                AND T.UNIT_NO = #{ORG_ID}
+            </when>
+            <otherwise>
+                AND T.UNIT_NO = (select distinct BUSINESS_SUPERIOR from tl9_orgbasic  where orgid = #{ORG_ID})
+            </otherwise>
+        </choose>
+    </select>
+
+	<select id="getQueueTimeGatherList"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        SELECT ROUND(WAIT_TIME_AVG,2) as value,ROUND(WAIT_TIME_T_AVG,2) as totalAvg,
+               ROUND(WAIT_TIME_AVG_RING,4) as rate,
+        <if test="DATE_TYPE =='day'">
+            TRADE_DATE as time
+            FROM SB_STATS_GATHER_D t
+            WHERE TO_DATE(t.TRADE_DATE,'YYYYMMDD')
+			BETWEEN ADD_MONTHS(TO_DATE(SUBSTR(#{TIME_VALUE}, 1,8), 'YYYYMMDD'),-2)
+			AND TO_DATE(SUBSTR(#{TIME_VALUE}, 10), 'YYYYMMDD')
+			AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            ORDER BY TO_DATE(t.TRADE_DATE,'YYYYMMDD') asc
+        </if>
+        <if test="DATE_TYPE =='month'">
+            TRADE_YM as time
+            FROM SB_STATS_GATHER_M t
+            WHERE TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{TIME_VALUE},'YYYYMM'),-1*13) AND TO_DATE(#{TIME_VALUE},'YYYYMM')
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            ORDER BY TO_DATE(t.TRADE_YM,'YYYYMM') asc
+        </if>
+        <if test="DATE_TYPE =='quarter'">
+            TRADE_QUARTER as time
+            FROM SB_STATS_GATHER_Q t
+            WHERE TO_DATE(t.TRADE_QUARTER,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{TIME_VALUE},'YYYYMM'),-3*5) AND TO_DATE(#{TIME_VALUE},'YYYYMM')
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            ORDER BY TO_DATE(t.TRADE_QUARTER,'YYYYMM') asc
+        </if>
+        <if test="DATE_TYPE =='year'">
+            TRADE_YEAR as time
+            FROM SB_STATS_GATHER_Y t
+            WHERE TO_NUMBER(t.TRADE_YEAR) BETWEEN TO_NUMBER(#{TIME_VALUE})-4 AND TO_NUMBER(#{TIME_VALUE})
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            ORDER BY TO_NUMBER(t.TRADE_YEAR) asc
+        </if>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+
+    <select id="getQueueTimeGroupList"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonGroupDomain">
+        SELECT QUEUE_TIME_GROUP as "group",TIME_GROUP_DESC as "desc",SUM(QUEUE_COUNT) as "value"
+        <if test="DATE_TYPE =='day'">
+            FROM SB_STATS_QUEUE_TIME_GROUP_D t
+            WHERE t.TRADE_DATE = to_number(SUBSTR(#{TIME_VALUE}, 10))
+        </if>
+        <if test="DATE_TYPE =='month'">
+            FROM SB_STATS_QUEUE_TIME_GROUP_M t
+            WHERE t.TRADE_YM = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="DATE_TYPE =='quarter'">
+            FROM SB_STATS_QUEUE_TIME_GROUP_Q t
+            WHERE t.TRADE_QUARTER = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="DATE_TYPE =='year'">
+            FROM SB_STATS_QUEUE_TIME_GROUP_Y t
+            WHERE t.TRADE_YEAR = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="ORG_ID != null">
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+        </if>
+        <if test="CUSTOMER_TYPE != null">
+            AND t.CUSTOMER_TYPE = #{CUSTOMER_TYPE}
+        </if>
+        GROUP BY t.QUEUE_TIME_GROUP,t.TIME_GROUP_DESC
+        ORDER BY t.QUEUE_TIME_GROUP
+    </select>
+
+    <select id="getCustTypeAvgUnitNo" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        SELECT distinct NVL(ROUND(WAIT_TIME_T_AVG,2),0) as totalAvg
+        <if test="DATE_TYPE == 'day' ">
+            FROM SB_STATS_QUEUE_CUS_D T            WHERE  T.TRADE_DATE = to_number(SUBSTR(#{TIME_VALUE}, 10))
+        </if>
+        <if test="DATE_TYPE == 'month' ">
+            FROM SB_STATS_QUEUE_CUS_M T            WHERE T.TRADE_YM = #{TIME_VALUE}
+        </if>
+        <if test="DATE_TYPE == 'quarter' ">
+            FROM SB_STATS_QUEUE_CUS_Q T            WHERE T.TRADE_QUARTER = #{TIME_VALUE}
+        </if>
+        <if test="DATE_TYPE == 'year' ">
+            FROM SB_STATS_QUEUE_CUS_Y T            WHERE T.TRADE_YEAR = #{TIME_VALUE}
+        </if>
+        AND T.CUSTOMER_TYPE = #{CUSTOMER_TYPE}
+        <choose>
+            <when test="BRANCH_STATS_TYPE==1">
+              AND T.UNIT_NO = #{ORG_ID}
+            </when>
+            <otherwise>
+                AND T.UNIT_NO = (select distinct BUSINESS_SUPERIOR from tl9_orgbasic  where orgid = #{ORG_ID})
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="getTimeDistributionByCustTypeList"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectCustTypeByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        SELECT CUSTOMER_TYPE as id,CUSTOMER_TYPE_NAME as name,
+               ROUND(WAIT_TIME_AVG,2) as value,ROUND(WAIT_TIME_T_AVG,2) as totalAvg,
+               ROUND(WAIT_TIME_AVG_RING,4) as rate,
+        <if test="DATE_TYPE =='day'">
+            TRADE_DATE as time
+            FROM SB_STATS_QUEUE_CUS_D t
+            WHERE TO_DATE(t.TRADE_DATE,'YYYYMMDD')
+			BETWEEN ADD_MONTHS(TO_DATE(SUBSTR(#{TIME_VALUE}, 1,8), 'YYYYMMDD'),-2)
+			AND TO_DATE(SUBSTR(#{TIME_VALUE}, 10), 'YYYYMMDD')
+			AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            AND t.CUSTOMER_TYPE = #{CUSTOMER_TYPE}
+            ORDER BY TO_DATE(t.TRADE_DATE,'YYYYMMDD') asc
+        </if>
+        <if test="DATE_TYPE =='month'">
+            TRADE_YM as time
+            FROM SB_STATS_QUEUE_CUS_M t
+            WHERE TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{TIME_VALUE},'YYYYMM'),-1*13) AND TO_DATE(#{TIME_VALUE},'YYYYMM')
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            AND t.CUSTOMER_TYPE = #{CUSTOMER_TYPE}
+            ORDER BY TO_DATE(t.TRADE_YM,'YYYYMM') asc
+        </if>
+        <if test="DATE_TYPE =='quarter'">
+
+            TRADE_QUARTER as time
+            FROM SB_STATS_QUEUE_CUS_Q t
+            WHERE TO_DATE(t.TRADE_QUARTER,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{TIME_VALUE},'YYYYMM'),-3*5) AND TO_DATE(#{TIME_VALUE},'YYYYMM')
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            AND t.CUSTOMER_TYPE = #{CUSTOMER_TYPE}
+            ORDER BY TO_DATE(t.TRADE_QUARTER,'YYYYMM') asc
+        </if>
+        <if test="DATE_TYPE =='year'">
+            TRADE_YEAR as time
+            FROM SB_STATS_QUEUE_CUS_Y t
+            WHERE TO_NUMBER(t.TRADE_YEAR) BETWEEN TO_NUMBER(#{TIME_VALUE})-4 AND TO_NUMBER(#{TIME_VALUE})
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+            AND t.CUSTOMER_TYPE = #{CUSTOMER_TYPE}
+            ORDER BY TO_NUMBER(t.TRADE_YEAR) asc
+        </if>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+
+    <select id="getQueueTimeDomainList"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonGroupDomain">
+        SELECT APPLY_TIME_STEP as "group",TIME_STEP_DESC as "desc",ROUND(WAIT_TIME_AVG,2) as "value"
+        <if test="DATE_TYPE =='day'">
+            FROM SB_STATS_QUEUE_TIME_STEP_D t
+            WHERE t.TRADE_DATE = to_number(SUBSTR(#{TIME_VALUE}, 10))
+        </if>
+        <if test="DATE_TYPE =='month'">
+            FROM SB_STATS_QUEUE_TIME_STEP_M t
+            WHERE t.TRADE_YM = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="DATE_TYPE =='quarter'">
+            FROM SB_STATS_QUEUE_TIME_STEP_Q t
+            WHERE t.TRADE_QUARTER = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="DATE_TYPE =='year'">
+            FROM SB_STATS_QUEUE_TIME_STEP_Y t
+            WHERE t.TRADE_YEAR = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="ORG_ID != null">
+            AND t.BRANCH_NO = #{ORG_ID}
+            <include refid="_branchStatsType_where"></include>
+        </if>
+        ORDER BY t.APPLY_TIME_STEP ASC
+    </select>
+
+    <select id="getQueueTimeRankList"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        SELECT row_number()over(order by t.WAIT_TIME_AVG asc) as rankNo,
+               BRANCH_NO as branchNo,BRANCH_NAME as branchName,
+               ROUND(WAIT_TIME_AVG,2) as "value",ROUND(WAIT_TIME_AVG_RING,4) as "rate"
+        <if test="DATE_TYPE =='day'">
+            FROM SB_STATS_GATHER_D t
+            WHERE t.TRADE_DATE = to_number(SUBSTR(#{TIME_VALUE}, 10))
+        </if>
+        <if test="DATE_TYPE =='month'">
+            FROM SB_STATS_GATHER_M t
+            WHERE t.TRADE_YM = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="DATE_TYPE =='quarter'">
+            FROM SB_STATS_GATHER_Q t
+            WHERE t.TRADE_QUARTER = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="DATE_TYPE =='year'">
+            FROM SB_STATS_GATHER_Y t
+            WHERE TO_NUMBER(t.TRADE_YEAR) = TO_NUMBER(#{TIME_VALUE})
+        </if>
+        <if test="ORG_ID != null">
+            AND t.UNIT_NO = #{ORG_ID}
+            <include refid="_unio_where"></include>
+        </if>
+		and t.QUEUE_COUNT IS NOT NULL
+        ORDER BY t.WAIT_TIME_AVG
+    </select>
+</mapper>

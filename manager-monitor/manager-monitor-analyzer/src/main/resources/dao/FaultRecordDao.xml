@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.FaultRecordDao">
+	<!--新增故障记录 -->
+	<insert id="insertInfo" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="SEQ_NO" order="BEFORE">
+			select
+			'R'||lpad(MAS_R_DEVICE_FAULT_SEQ.nextval, 31, '0') as
+			SEQ_NO From DUAL
+		</selectKey>
+		INSERT INTO MAS_R_DEVICE_FAULT(
+			SEQ_NO,
+			BRANCH_NO,
+			MAC,
+			DEVMODELKEY,
+			DEVCLASSKEY,
+			DEVCLASSNAME,
+			M_TYPE,
+			MID,
+			MNAME,
+			MMODELKEY,
+			MCLASSKEY,
+			MCLASSNAME,
+			FIELD_NO,
+			FIELD_NAME,
+			MANUF_ID,
+			MANUF_NAME,
+			STATUS,
+			STATUS_CODE,
+			STATUS_DESC,
+			M_STATUS,
+			START_TIME,
+			START_TIME_INT,
+			END_TIME,
+			END_TIME_INT,
+			BRANCH_NAME
+		) VALUES (
+			#{SEQ_NO},
+			#{BRANCH_NO},
+			#{MAC},
+			#{DEVMODELKEY,jdbcType=VARCHAR},
+			#{DEVCLASSKEY,jdbcType=VARCHAR},
+			#{DEVCLASSNAME,jdbcType=VARCHAR},
+			#{M_TYPE},
+			#{MID},
+			#{MNAME,jdbcType=VARCHAR},
+			#{MMODELKEY},
+			#{MCLASSKEY},
+			#{MCLASSNAME},
+			#{FIELD_NO, jdbcType=VARCHAR},
+			#{FIELD_NAME, jdbcType=VARCHAR},
+			#{MANUF_ID, jdbcType=VARCHAR},
+			#{MANUF_NAME, jdbcType=VARCHAR},
+			#{STATUS, jdbcType=DECIMAL},
+			#{STATUS_CODE,jdbcType=VARCHAR},
+			#{STATUS_DESC,jdbcType=VARCHAR},
+			#{M_STATUS},
+			#{START_TIME},
+			#{START_TIME_INT},
+			#{END_TIME,jdbcType=DATE},
+			#{END_TIME_INT,jdbcType=NUMERIC},
+			#{BRANCH_NAME,jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<!-- 更新故障记录 -->
+	<update id="updateInfo" parameterType="java.util.HashMap">
+		UPDATE MAS_R_DEVICE_FAULT
+		<set>
+			<if test="END_TIME != null">END_TIME=#{END_TIME},</if>
+			<if test="END_TIME_INT != null">END_TIME_INT=#{END_TIME_INT}</if>
+		</set>
+		WHERE SEQ_NO=#{SEQ_NO}
+	</update>
+
+	<!-- 查询故障记录 -->
+	<select id="queryInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			SEQ_NO,
+			MAC,
+			STATUS,
+			START_TIME,
+			END_TIME
+		FROM
+			MAS_R_DEVICE_FAULT
+		WHERE
+			BRANCH_NO=#{BRANCH_NO}
+			AND M_TYPE=#{M_TYPE}
+			AND MAC=#{MAC}
+			<if test="DEVCLASSKEY != null">
+				AND DEVCLASSKEY=#{DEVCLASSKEY}
+			</if>
+			<if test="M_TYPE == 'DEVICE'">
+				AND DEVMODELKEY=#{DEVMODELKEY}
+			</if>
+			AND END_TIME IS NULL
+		ORDER BY START_TIME DESC
+	</select>
+
+	<!-- 查询制定日期的所有故障记录 -->
+	<select id="queryAllInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+		    A.MAC,
+		    'DEVICE' AS M_TYPE,
+		    B.devmodelkey,
+		    e.devclasskey,
+		    e.devclassname,
+		    A.branch_no,
+		    f.orgname_cn    AS BRANCH_NAME,
+		    A.TERMINALID    AS MID,
+		    C1.devmodelname AS mname,
+		    a.devmodelkey   AS mmodelkey,
+		    a.devclasskey   AS mclasskey,
+		    e1.devclassname AS mclassname,
+		    g.MANUFACTURERID as manuf_id,
+		    g.NAME as MANUF_NAME,
+		    H.field_NO as FIELD_NO,
+		    H.field_NAME as FIELD_NAME,
+		    case when mdf.start_time is null then to_date(#{REPORT_DATE}||'23:59:59','yyyy-mm-ddHH24:mi:ss') else mdf.start_time end as start_time,
+		    case when mdf.end_time is null then to_date(#{REPORT_DATE}||'23:59:59','yyyy-mm-ddHH24:mi:ss') else mdf.end_time end as end_time
+		FROM
+		    TL9_SM_BRANCH_DEVICE A
+		LEFT JOIN
+		    TL9_TERMINAL_DEVICE_BIND B
+		ON
+		    A.terminalid = B.terminalid
+		AND b.status = '1'
+		LEFT JOIN
+		   TL9_DEVICE_MODEL_CLASS DMC
+		ON
+		    DMC.DEVMODELKEY = B.DEVMODELKEY
+		LEFT JOIN
+		    MAS_R_DEVICE_FAULT MDF
+		ON
+		    A.MAC =MDF.MAC
+		AND MDF.DEVCLASSKEY = DMC.DEVCLASSKEY
+		AND MDF.M_TYPE='DEVICE'
+		and to_char(START_TIME,'yyyy-mm-dd') =#{REPORT_DATE},
+		    TL9_DEVICE_MODEL C,
+		    TL9_DEVICE_MODEL_CLASS D,
+		    TL9_DEVICE_CLASS E,
+		    TL9_ORGBASIC F,
+		    TL9_DEVICE_MODEL C1 left join TL9_DEVICE_MANUFACTURER G
+    		on g.MANUFACTURERID = c1.MANUFACTURERID,
+		    TL9_DEVICE_CLASS E1,
+    		TL9_SM_BRANCH_SETTING H
+		WHERE
+		    b.devmodelkey = c.devmodelkey
+		AND c.devmodelkey = d.devmodelkey
+		AND d.devclasskey = e.devclasskey
+		AND a.branch_no = f.orgid
+		AND a.devmodelkey = c1.devmodelkey
+		AND a.devclasskey = e1.devclasskey
+		AND H.BRANCH_SETTING_ID = A.BRANCH_SETTING_ID
+		union all
+		SELECT
+		    A.MAC,
+		    'APP' AS M_TYPE,
+		    '' as devmodelkey,
+		    '' as devclasskey,
+		    '' as devclassname,
+		    A.branch_no,
+		    f.orgname_cn    AS BRANCH_NAME,
+		    A.TERMINALID    AS MID,
+		    C1.devmodelname AS mname,
+		    a.devmodelkey   AS mmodelkey,
+		    a.devclasskey   AS mclasskey,
+		    e1.devclassname AS mclassname,
+		    g.MANUFACTURERID as manuf_id,
+		    g.NAME as MANUF_NAME,
+		    H.field_NO as FIELD_NO,
+		    H.field_NAME as FIELD_NAME,
+		    case when mdf.start_time is null then to_date(#{REPORT_DATE}||'23:59:59','yyyy-mm-ddHH24:mi:ss') else mdf.start_time end as start_time,
+		    case when mdf.end_time is null then to_date(#{REPORT_DATE}||'23:59:59','yyyy-mm-ddHH24:mi:ss') else mdf.end_time end as end_time
+		FROM
+		    TL9_SM_BRANCH_DEVICE A
+		LEFT JOIN
+		    MAS_R_DEVICE_FAULT MDF
+		ON
+		    A.MAC =MDF.MAC
+		AND MDF.MCLASSKEY = A.DEVCLASSKEY
+		AND MDF.M_TYPE='APP'
+		and to_char(START_TIME,'yyyy-mm-dd') =#{REPORT_DATE},
+		    TL9_ORGBASIC F,
+		    TL9_DEVICE_MODEL C1 left join TL9_DEVICE_MANUFACTURER G
+    		on g.MANUFACTURERID = c1.MANUFACTURERID,
+		    TL9_DEVICE_CLASS E1,
+    		TL9_SM_BRANCH_SETTING H
+		WHERE a.branch_no = f.orgid
+		AND a.devmodelkey = c1.devmodelkey
+		AND a.devclasskey = e1.devclasskey
+		AND H.BRANCH_SETTING_ID = A.BRANCH_SETTING_ID
+		union all
+		SELECT
+		    A.MAC,
+		    'NETWORK' AS M_TYPE,
+		    '' as devmodelkey,
+		    '' as devclasskey,
+		    '' as devclassname,
+		    A.branch_no,
+		    f.orgname_cn    AS BRANCH_NAME,
+		    A.TERMINALID    AS MID,
+		    C1.devmodelname AS mname,
+		    a.devmodelkey   AS mmodelkey,
+		    a.devclasskey   AS mclasskey,
+		    e1.devclassname AS mclassname,
+		    g.MANUFACTURERID as manuf_id,
+		    g.NAME as MANUF_NAME,
+		    H.field_NO as FIELD_NO,
+		    H.field_NAME as FIELD_NAME,
+		    case when mdf.start_time is null then to_date(#{REPORT_DATE}||'23:59:59','yyyy-mm-ddHH24:mi:ss') else mdf.start_time end as start_time,
+		    case when mdf.end_time is null then to_date(#{REPORT_DATE}||'23:59:59','yyyy-mm-ddHH24:mi:ss') else mdf.end_time end as end_time
+		FROM
+		    TL9_SM_BRANCH_DEVICE A
+		LEFT JOIN
+		    MAS_R_DEVICE_FAULT MDF
+		ON
+		    A.MAC =MDF.MAC
+		AND MDF.MCLASSKEY = A.DEVCLASSKEY
+		AND MDF.M_TYPE='NETWORK'
+		and to_char(START_TIME,'yyyy-mm-dd') =#{REPORT_DATE},
+		    TL9_ORGBASIC F,
+		    TL9_DEVICE_MODEL C1 left join TL9_DEVICE_MANUFACTURER G
+    		on g.MANUFACTURERID = c1.MANUFACTURERID,
+		    TL9_DEVICE_CLASS E1,
+    		TL9_SM_BRANCH_SETTING H
+		WHERE a.branch_no = f.orgid
+		AND a.devmodelkey = c1.devmodelkey
+		AND a.devclasskey = e1.devclasskey
+		AND H.BRANCH_SETTING_ID = A.BRANCH_SETTING_ID
+
+		ORDER BY START_TIME
+	</select>
+
+	<!-- 自动生成昨日未解决的故障记录 -->
+	<insert id="createFaultRecord" parameterType="java.util.HashMap" >
+		INSERT INTO MAS_R_DEVICE_FAULT(
+			SEQ_NO,
+			BRANCH_NO,
+			MAC,
+			DEVMODELKEY,
+			DEVCLASSKEY,
+			DEVCLASSNAME,
+			M_TYPE,
+			MID,
+			MNAME,
+			MMODELKEY,
+			MCLASSKEY,
+			MCLASSNAME,
+			FIELD_NO,
+			FIELD_NAME,
+			MANUF_ID,
+			MANUF_NAME,
+			STATUS,
+			STATUS_CODE,
+			STATUS_DESC,
+			M_STATUS,
+			START_TIME,
+			START_TIME_INT,
+			END_TIME,
+			END_TIME_INT,
+			BRANCH_NAME
+		) select  'R'||lpad(MAS_R_DEVICE_FAULT_SEQ.nextval, 31, '0'),
+			BRANCH_NO,
+			MAC,
+			DEVMODELKEY,
+			DEVCLASSKEY,
+			DEVCLASSNAME,
+			M_TYPE,
+			MID,
+			MNAME,
+			MMODELKEY,
+			MCLASSKEY,
+			MCLASSNAME,
+			FIELD_NO,
+			FIELD_NAME,
+			MANUF_ID,
+			MANUF_NAME,
+			STATUS,
+			STATUS_CODE,
+			STATUS_DESC,
+			M_STATUS,
+			to_date(#{REPORT_DATE}||' 00:00:00','yyyy-mm-dd HH24:mi:ss'),
+			#{NOWL},
+			END_TIME,
+			END_TIME_INT,
+			BRANCH_NAME from MAS_R_DEVICE_FAULT where END_TIME is null and to_char(START_TIME + 1,'yyyy-mm-dd')= #{REPORT_DATE}
+	</insert>
+</mapper>

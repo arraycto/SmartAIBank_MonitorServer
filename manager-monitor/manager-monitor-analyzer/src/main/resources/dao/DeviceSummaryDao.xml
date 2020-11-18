@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.DeviceSummaryDao">
+	<insert id="insert" parameterType="java.util.HashMap">
+		INSERT INTO MAS_DEVICE_INFO_SUM(
+			BRANCH_NO,
+			MAC,
+			MID,
+			MNAME,
+			MMODELKEY,
+			MCLASSKEY,
+			MCLASSNAME,
+			MTYPEKEY,
+			MTYPENAME,
+			FIELD_NO,
+			FIELD_NAME,
+			MANUF_ID,
+			MANUF_NAME,
+			M_STATUS,
+			STATUS_DESC,
+			RECEIVE_TIME,
+			RECEIVE_TIME_INT,
+			HANDLE_COUNTY,
+			HANDLE_CITY,
+			HANDLE_PROVINCE,
+			BRANCH_NAME,
+			NETWORK_STATUS,
+			APP_STATUS,
+			PERIPHERAL_STATUS,
+			NETWORK_TIME,
+			APP_TIME,
+			PERIPHERAL_TIME
+		) VALUES (
+			#{BRANCH_NO},
+			#{MAC},
+			#{MID},
+			#{MNAME,jdbcType=VARCHAR},
+			#{MMODELKEY},
+			#{MCLASSKEY},
+			#{MCLASSNAME},
+			#{MTYPEKEY, jdbcType=NUMERIC},
+			#{MTYPENAME, jdbcType=VARCHAR},
+			#{FIELD_NO},
+			#{FIELD_NAME},
+			(select MANUFACTURERID from TL9_DEVICE_MODEL where DEVMODELKEY=#{MMODELKEY}),
+			(select B.NAME from TL9_DEVICE_MODEL A,TL9_DEVICE_MANUFACTURER B
+				where A.DEVMODELKEY=#{MMODELKEY} AND A.MANUFACTURERID = B.MANUFACTURERID),
+			#{M_STATUS},
+			#{STATUS_DESC,jdbcType=VARCHAR},
+			#{RECEIVE_TIME},
+			#{RECEIVE_TIME_INT},
+			#{HANDLE_COUNTY, jdbcType=VARCHAR},
+			#{HANDLE_CITY, jdbcType=VARCHAR},
+			#{HANDLE_PROVINCE, jdbcType=VARCHAR},
+			#{BRANCH_NAME, jdbcType=VARCHAR},
+			#{NETWORK_STATUS, jdbcType=INTEGER},
+			#{APP_STATUS, jdbcType=INTEGER},
+			#{PERIPHERAL_STATUS, jdbcType=INTEGER},
+			to_timestamp(#{NETWORK_TIME,jdbcType=DATE},'yyyy-mm-dd hh24:mi:ss.ff6'),
+			to_timestamp(#{APP_TIME,jdbcType=DATE},'yyyy-mm-dd hh24:mi:ss.ff6'),
+			to_timestamp(#{PERIPHERAL_TIME,jdbcType=DATE},'yyyy-mm-dd hh24:mi:ss.ff6')
+		)
+	</insert>
+
+	<update id="update" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_DEVICE_INFO_SUM
+		SET
+			M_STATUS=#{M_STATUS}
+			,STATUS_DESC=#{STATUS_DESC, jdbcType=VARCHAR}
+			,BRANCH_NO=#{BRANCH_NO, jdbcType=VARCHAR}
+			,BRANCH_NAME=#{BRANCH_NAME, jdbcType=VARCHAR}
+			,RECEIVE_TIME=#{RECEIVE_TIME}
+			,RECEIVE_TIME_INT=#{RECEIVE_TIME_INT}
+			,FIELD_NO=#{FIELD_NO}
+			,FIELD_NAME=#{FIELD_NAME}
+			,MANUF_ID = (select MANUFACTURERID from TL9_DEVICE_MODEL where DEVMODELKEY=#{MMODELKEY})
+			,MANUF_NAME =(select B.NAME from TL9_DEVICE_MODEL A,TL9_DEVICE_MANUFACTURER B
+				where A.DEVMODELKEY=#{MMODELKEY} AND A.MANUFACTURERID = B.MANUFACTURERID)
+			,NETWORK_STATUS=#{NETWORK_STATUS, jdbcType=INTEGER}
+			,APP_STATUS=#{APP_STATUS, jdbcType=INTEGER}
+			,PERIPHERAL_STATUS=#{PERIPHERAL_STATUS, jdbcType=INTEGER}
+			,NETWORK_TIME= to_timestamp(#{NETWORK_TIME, jdbcType=DATE},'yyyy/MM/dd hh24:mi:ss')
+			,APP_TIME= to_timestamp(#{APP_TIME, jdbcType=DATE},'yyyy/MM/dd hh24:mi:ss')
+			,PERIPHERAL_TIME=to_timestamp(#{PERIPHERAL_TIME, jdbcType=DATE},'yyyy/MM/dd hh24:mi:ss')
+		WHERE
+			MAC=#{MAC}
+	</update>
+
+	<select id="queryStatus" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT
+			*
+		FROM
+			(SELECT
+				*
+			FROM
+				MAS_DEVICE_INFO
+			WHERE
+				MAC=#{MAC}
+				AND to_char(RECEIVE_TIME,'yyyymmdd')=#{RECEIVE_TIME}
+			ORDER BY
+				M_STATUS DESC,RECEIVE_TIME_INT DESC)
+		WHERE rownum=1
+	</select>
+
+	<select id="querySumCount" parameterType="java.lang.String" resultType="java.lang.Integer">
+		SELECT count(*) FROM MAS_DEVICE_INFO_SUM WHERE MAC=#{MAC}
+	</select>
+
+	<select id="queryBranchInfo" parameterType="java.lang.String" resultType="java.util.HashMap">
+		SELECT
+			ORGNAME_CN as BRANCH_NAME,
+			ADDRESS_COUNTY as HANDLE_COUNTY,
+			ADDRESS_CITY as HANDLE_CITY,
+			ADDRESS_PROVINCE as HANDLE_PROVINCE
+		FROM
+			TL9_ORGBASIC
+		WHERE
+			ORGID=#{VALUE}
+	</select>
+
+	<select id="selectSingleDeviceInfo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.monitor.rule.domain.DeviceInfo">
+		SELECT M_TYPE as monitorType,
+			   STATUS as status,
+			   RECEIVE_TIME as receiveTime
+		  FROM MAS_DEVICE_INFO
+		 WHERE MAC = #{MAC}
+			   AND TO_CHAR (RECEIVE_TIME, 'yyyymmdd') = #{RECEIVE_TIME}
+	</select>
+</mapper>

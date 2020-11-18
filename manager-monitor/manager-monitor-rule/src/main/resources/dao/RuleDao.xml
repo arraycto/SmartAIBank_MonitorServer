@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.rule.dao.RuleDao">
+	<resultMap id="monitorItemMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.MonitorItem">
+		<id property="id" column="ITEM_ID"/>
+		<result property="name" column="ITEM_NAME"/>
+		<result property="description" column="ITEM_DESCRIPTION"/>
+		<result property="active" column="ITEM_ACTIVE" javaType="boolean"/>
+		<result property="alarm" column="ITEM_ALARM" javaType="boolean"/>
+		<result property="createTime" column="ITEM_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="ITEM_UPDATE_TIME" javaType="java.util.Date"/>
+	</resultMap>
+
+	<resultMap id="executorMap" type="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine">
+		<id property="id" column="EXECUTOR_ID"/>
+		<result property="name" column="EXECUTOR_NAME"/>
+		<result property="description" column="EXECUTOR_DESCRIPTION"/>
+		<result property="type" column="EXECUTOR_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="executor" column="EXECUTOR_EXECUTOR"/>
+		<result property="returnType" column="EXECUTOR_RETURN_TYPE"/>
+		<result property="key" column="EXECUTOR_KEY"/>
+		<result property="createTime" column="EXECUTOR_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="EXECUTOR_UPDATE_TIME" javaType="java.util.Date"/>
+	</resultMap>
+
+	<resultMap id="filterRuleMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.FilterRule">
+		<id property="id" column="FILTER_ID"/>
+		<result property="name" column="FILTER_NAME"/>
+		<result property="description" column="FILTER_DESCRIPTION"/>
+		<result property="active" column="FILTER_ACTIVE" javaType="boolean"/>
+		<result property="type" column="FILTER_RULE_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="createTime" column="FILTER_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="FILTER_UPDATE_TIME" javaType="java.util.Date"/>
+		<association property="executor" resultMap="executorMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine"/>
+	</resultMap>
+	<resultMap id="realRuleMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.RealRule">
+		<id property="id" column="REAL_ID"/>
+		<result property="name" column="REAL_NAME"/>
+		<result property="description" column="REAL_DESCRIPTION"/>
+		<result property="active" column="REAL_ACTIVE" javaType="boolean"/>
+		<result property="type" column="REAL_RULE_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="systemId" column="REAL_SYSTEM_ID"/>
+		<result property="messageType" column="REAL_MESSAGE_TYPE"/>
+		<result property="createTime" column="REAL_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="REAL_UPDATE_TIME" javaType="java.util.Date"/>
+		<association property="monitorItem" resultMap="monitorItemMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.rule.domain.MonitorItem"/>
+		<association property="executor" resultMap="executorMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine"/>
+	</resultMap>
+
+	<resultMap id="prepareRuleMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.PrepareRule">
+		<id property="id" column="PREPARE_ID"/>
+		<result property="name" column="PREPARE_NAME"/>
+		<result property="description" column="PREPARE_DESCRIPTION"/>
+		<result property="active" column="PREPARE_ACTIVE" javaType="boolean"/>
+		<result property="type" column="PREPARE_RULE_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="systemId" column="PREPARE_SYSTEM_ID"/>
+		<result property="messageType" column="PREPARE_MESSAGE_TYPE"/>
+		<result property="createTime" column="PREPARE_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="PREPARE_UPDATE_TIME" javaType="java.util.Date"/>
+		<association property="monitorItem" resultMap="monitorItemMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.rule.domain.MonitorItem"/>
+		<association property="executor" resultMap="executorMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine"/>
+	</resultMap>
+	<resultMap id="alarmRuleMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.AlarmRule">
+		<id property="id" column="ALARM_ID"/>
+		<result property="name" column="ALARM_NAME"/>
+		<result property="description" column="ALARM_DESCRIPTION"/>
+		<result property="active" column="ALARM_ACTIVE" javaType="boolean"/>
+		<result property="type" column="ALARM_RULE_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="level" column="ALARM_ALARM_LEVEL"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="createTime" column="ALARM_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="ALARM_UPDATE_TIME" javaType="java.util.Date"/>
+		<association property="monitorItem" resultMap="monitorItemMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.rule.domain.MonitorItem"/>
+		<association property="executor" resultMap="executorMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine"/>
+	</resultMap>
+	<resultMap id="timedRuleMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.TimedRule">
+		<id property="id" column="TIMED_ID"/>
+		<result property="name" column="TIMED_NAME"/>
+		<result property="description" column="TIMED_DESCRIPTION"/>
+		<result property="active" column="TIMED_ACTIVE" javaType="boolean"/>
+		<result property="type" column="TIMED_RULE_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="systemId" column="TIMED_SYSTEM_ID"/>
+		<result property="messageType" column="TIMED_MESSAGE_TYPE"/>
+		<result property="cron" column="TIMED_CRON"/>
+		<result property="cronDesc" column="TIMED_CRON_DESC"/>
+		<result property="createTime" column="TIMED_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="TIMED_UPDATE_TIME" javaType="java.util.Date"/>
+		<association property="monitorItem" resultMap="monitorItemMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.rule.domain.MonitorItem"/>
+		<association property="executor" resultMap="executorMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine"/>
+	</resultMap>
+
+	<resultMap id="templateDefineMap" type="com.dcfs.smartaibank.manager.monitor.core.template.TemplateDefine">
+		<id property="id" column="TEMPLATE_DEFINE_ID"/>
+		<result property="name" column="TEMPLATE_DEFINE_NAME"/>
+		<result property="description" column="TEMPLATE_DEFINE_DESCRIPTION"/>
+		<result property="type" column="TEMPLATE_DEFINE_TYPE"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result property="content" column="TEMPLATE_DEFINE_CONTENT"/>
+	</resultMap>
+	<resultMap id="notifyRuleMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.NotifyRule">
+		<id property="id" column="NOTIFY_ID"/>
+		<result property="name" column="NOTIFY_NAME"/>
+		<result property="description" column="NOTIFY_DESCRIPTION"/>
+		<result property="active" column="NOTIFY_ACTIVE" javaType="boolean"/>
+		<result property="type" column="NOTIFY_RULE_TYPE"/>
+		<result property="notifyType" column="NOTIFY_NOTIFY_TYPE"/>
+		<result property="contentType" column="NOTIFY_CONTENT_TYPE"/>
+		<result property="createTime" column="NOTIFY_CREATE_TIME" javaType="java.util.Date"/>
+		<result property="updateTime" column="NOTIFY_UPDATE_TIME" javaType="java.util.Date"/>
+		<association property="monitorItem" resultMap="monitorItemMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.rule.domain.MonitorItem"/>
+		<association property="templateDefine" resultMap="templateDefineMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.template.TemplateDefine"/>
+		<association property="executor" resultMap="executorMap"
+					 javaType="com.dcfs.smartaibank.manager.monitor.core.executor.ExecuteDefine"/>
+		<collection property="users" javaType="list" ofType="com.dcfs.smartaibank.manager.monitor.rule.domain.User">
+			<id property="id" column="USER_ID"/>
+			<result property="name" column="USER_NAME"/>
+			<result property="email" column="USER_EMAIL"/>
+			<result property="phone" column="USER_PHONE"/>
+			<result property="weixin" column="USER_WEIXIN"/>
+			<result property="branchNo" column="USER_BRANCH_NO"/>
+			<result property="superior" column="USER_SUPERIOR_NO"/>
+			<result property="head" column="USER_HEAD_FLAG" javaType="java.lang.Boolean"/>
+		</collection>
+	</resultMap>
+	<select id="getAllMonitorItem" resultMap="monitorItemMap">
+    	SELECT
+			ID as ITEM_ID,
+			NAME as ITEM_NAME,
+			DESCRIPTION as ITEM_DESCRIPTION,
+			ACTIVE as ITEM_ACTIVE,
+			ALARM as IMTE_ALARM,
+			CREATE_TIME as ITEM_CREATE_TIME,
+			UPDATE_TIME as ITEM_UPDATE_TIME
+    	FROM
+    		MAS_MONITOR_ITEM
+	</select>
+	<select id="getAllFilterRule" resultMap="filterRuleMap">
+    	SELECT
+			F.ID AS FILTER_ID,
+			F.NAME AS FILTER_NAME,
+			F.DESCRIPTION AS FILTER_DESCRIPTION,
+			F.ACTIVE AS FILTER_ACTIVE,
+			F.CREATE_TIME AS FILTER_CREATE_TIME,
+			F.UPDATE_TIME AS FILTER_UPDATE_TIME,
+			F.RULE_TYPE AS FILTER_RULE_TYPE,
+			E.ID AS EXECUTOR_ID,
+			E.NAME AS EXECUTOR_NAME,
+			E.DESCRIPTION AS EXECUTOR_DESCRIPTION,
+			E.EXECUTOR_TYPE AS EXECUTOR_TYPE,
+			E.EXECUTOR AS EXECUTOR_EXECUTOR,
+			E.EXECUTOR_RETURN AS EXECUTOR_RETURN_TYPE,
+			E.EXECUTOR_KEY AS EXECUTOR_KEY,
+			E.CREATE_TIME AS EXECUTOR_CREATE_TIME,
+			E.UPDATE_TIME AS EXECUTOR_UPDATE_TIME
+    	FROM
+    		MAS_RULE_FILTER F
+    	LEFT JOIN MAS_EXECUTOR E
+    		ON E.ID=F.EXECUTOR_ID
+	</select>
+	<select id="getAllRealRule" resultMap="realRuleMap">
+    	SELECT
+			R.ID AS REAL_ID,
+			R.NAME AS REAL_NAME,
+			R.DESCRIPTION AS REAL_DESCRIPTION,
+			R.ACTIVE AS REAL_ACTIVE,
+			R.CREATE_TIME AS REAL_CREATE_TIME,
+			R.UPDATE_TIME AS REAL_UPDATE_TIME,
+			R.RULE_TYPE AS REAL_RULE_TYPE,
+			R.SYSTEM_ID AS REAL_SYSTEM_ID,
+			R.MESSAGE_TYPE AS REAL_MESSAGE_TYPE,
+			I.ID AS ITEM_ID,
+			I.NAME AS ITEM_NAME,
+			I.DESCRIPTION AS ITEM_DESCRIPTION,
+			I.ACTIVE AS ITEM_ACTIVE,
+			I.ALARM AS IMTE_ALARM,
+			I.CREATE_TIME AS ITEM_CREATE_TIME,
+			I.UPDATE_TIME AS ITEM_UPDATE_TIME,
+			E.ID AS EXECUTOR_ID,
+			E.NAME AS EXECUTOR_NAME,
+			E.DESCRIPTION AS EXECUTOR_DESCRIPTION,
+			E.EXECUTOR_TYPE AS EXECUTOR_TYPE,
+			E.EXECUTOR AS EXECUTOR_EXECUTOR,
+			E.EXECUTOR_RETURN AS EXECUTOR_RETURN_TYPE,
+			E.EXECUTOR_KEY AS EXECUTOR_KEY,
+			E.CREATE_TIME AS EXECUTOR_CREATE_TIME,
+			E.UPDATE_TIME AS EXECUTOR_UPDATE_TIME
+    	FROM
+    		MAS_RULE_REAL R
+    	LEFT JOIN MAS_MONITOR_ITEM I
+    		ON R.MONITOR_ITEM_ID = I.ID
+    	LEFT JOIN MAS_EXECUTOR E
+    		ON E.ID=R.EXECUTOR_ID
+	</select>
+	<select id="getAllPrepareRule" resultMap="prepareRuleMap">
+    	SELECT
+			R.ID AS PREPARE_ID,
+			R.NAME AS PREPARE_NAME,
+			R.DESCRIPTION AS PREPARE_DESCRIPTION,
+			R.ACTIVE AS PREPARE_ACTIVE,
+			R.CREATE_TIME AS PREPARE_CREATE_TIME,
+			R.UPDATE_TIME AS PREPARE_UPDATE_TIME,
+			R.RULE_TYPE AS PREPARE_RULE_TYPE,
+			R.SYSTEM_ID AS PREPARE_SYSTEM_ID,
+			R.MESSAGE_TYPE AS PREPARE_MESSAGE_TYPE,
+			I.ID AS ITEM_ID,
+			I.NAME AS ITEM_NAME,
+			I.DESCRIPTION AS ITEM_DESCRIPTION,
+			I.ACTIVE AS ITEM_ACTIVE,
+			I.ALARM AS IMTE_ALARM,
+			I.CREATE_TIME AS ITEM_CREATE_TIME,
+			I.UPDATE_TIME AS ITEM_UPDATE_TIME,
+			E.ID AS EXECUTOR_ID,
+			E.NAME AS EXECUTOR_NAME,
+			E.DESCRIPTION AS EXECUTOR_DESCRIPTION,
+			E.EXECUTOR_TYPE AS EXECUTOR_TYPE,
+			E.EXECUTOR AS EXECUTOR_EXECUTOR,
+			E.EXECUTOR_RETURN AS EXECUTOR_RETURN_TYPE,
+			E.EXECUTOR_KEY AS EXECUTOR_KEY,
+			E.CREATE_TIME AS EXECUTOR_CREATE_TIME,
+			E.UPDATE_TIME AS EXECUTOR_UPDATE_TIME
+    	FROM
+    		MAS_RULE_PREPARE R
+    	LEFT JOIN MAS_MONITOR_ITEM I
+    		ON R.MONITOR_ITEM_ID = I.ID
+    	LEFT JOIN MAS_EXECUTOR E
+    		ON E.ID=R.EXECUTOR_ID
+	</select>
+	<select id="getAllAlarmRule" resultMap="alarmRuleMap">
+    	SELECT
+			R.ID as ALARM_ID,
+			R.NAME as ALARM_NAME,
+			R.DESCRIPTION as ALARM_DESCRIPTION,
+			R.ACTIVE as ALARM_ACTIVE,
+			R.CREATE_TIME as ALARM_CREATE_TIME,
+			R.UPDATE_TIME as ALARM_UPDATE_TIME,
+			R.RULE_TYPE as ALARM_RULE_TYPE,
+			R.ALARM_LEVEL as ALARM_ALARM_LEVEL,
+			I.ID as ITEM_ID,
+			I.NAME as ITEM_NAME,
+			I.DESCRIPTION as ITEM_DESCRIPTION,
+			I.ACTIVE as ITEM_ACTIVE,
+			I.ALARM as IMTE_ALARM,
+			I.CREATE_TIME as ITEM_CREATE_TIME,
+			I.UPDATE_TIME as ITEM_UPDATE_TIME,
+			E.ID AS EXECUTOR_ID,
+			E.NAME AS EXECUTOR_NAME,
+			E.DESCRIPTION AS EXECUTOR_DESCRIPTION,
+			E.EXECUTOR_TYPE AS EXECUTOR_TYPE,
+			E.EXECUTOR AS EXECUTOR_EXECUTOR,
+			E.EXECUTOR_RETURN AS EXECUTOR_RETURN_TYPE,
+			E.EXECUTOR_KEY AS EXECUTOR_KEY,
+			E.CREATE_TIME AS EXECUTOR_CREATE_TIME,
+			E.UPDATE_TIME AS EXECUTOR_UPDATE_TIME
+    	FROM
+    		MAS_RULE_ALARM R
+    	LEFT JOIN MAS_MONITOR_ITEM I
+    		ON R.MONITOR_ITEM_ID = I.ID
+    	LEFT JOIN MAS_EXECUTOR E
+    		ON E.ID=R.EXECUTOR_ID
+	</select>
+	<select id="getAllTimedRule" resultMap="timedRuleMap">
+    	SELECT
+			R.ID as TIMED_ID,
+			R.NAME as TIMED_NAME,
+			R.DESCRIPTION as TIMED_DESCRIPTION,
+			R.ACTIVE as TIMED_ACTIVE,
+			R.CREATE_TIME as TIMED_CREATE_TIME,
+			R.UPDATE_TIME as TIMED_UPDATE_TIME,
+			R.RULE_TYPE as TIMED_RULE_TYPE,
+			R.SYSTEM_ID as TIMED_SYSTEM_ID,
+			R.MESSAGE_TYPE as TIMED_MESSAGE_TYPE,
+			R.CRON as TIMED_CRON,
+			R.CRON_DESC as TIMED_CRON_DESC,
+			I.ID as ITEM_ID,
+			I.NAME as ITEM_NAME,
+			I.DESCRIPTION as ITEM_DESCRIPTION,
+			I.ACTIVE as ITEM_ACTIVE,
+			I.ALARM as IMTE_ALARM,
+			I.CREATE_TIME as ITEM_CREATE_TIME,
+			I.UPDATE_TIME as ITEM_UPDATE_TIME,
+			E.ID AS EXECUTOR_ID,
+			E.NAME AS EXECUTOR_NAME,
+			E.DESCRIPTION AS EXECUTOR_DESCRIPTION,
+			E.EXECUTOR_TYPE AS EXECUTOR_TYPE,
+			E.EXECUTOR AS EXECUTOR_EXECUTOR,
+			E.EXECUTOR_RETURN AS EXECUTOR_RETURN_TYPE,
+			E.EXECUTOR_KEY AS EXECUTOR_KEY,
+			E.CREATE_TIME AS EXECUTOR_CREATE_TIME,
+			E.UPDATE_TIME AS EXECUTOR_UPDATE_TIME
+    	FROM
+    		MAS_RULE_TIMED R
+    	LEFT JOIN MAS_MONITOR_ITEM I
+    		ON R.MONITOR_ITEM_ID = I.ID
+    	LEFT JOIN MAS_EXECUTOR E
+    		ON E.ID=R.EXECUTOR_ID
+	</select>
+	<select id="getAllNotifyRule" resultMap="notifyRuleMap">
+    	SELECT
+			R.ID as NOTIFY_ID,
+			R.NAME as NOTIFY_NAME,
+			R.DESCRIPTION as NOTIFY_DESCRIPTION,
+			R.ACTIVE as NOTIFY_ACTIVE,
+			R.CREATE_TIME as NOTIFY_CREATE_TIME,
+			R.UPDATE_TIME as NOTIFY_UPDATE_TIME,
+			R.RULE_TYPE as NOTIFY_RULE_TYPE,
+			R.NOTIFY_TYPE as NOTIFY_NOTIFY_TYPE,
+			R.CONTENT_TYPE as NOTIFY_CONTENT_TYPE,
+			I.ID as ITEM_ID,
+			I.NAME as ITEM_NAME,
+			I.DESCRIPTION as ITEM_DESCRIPTION,
+			I.ACTIVE as ITEM_ACTIVE,
+			I.ALARM as IMTE_ALARM,
+			I.CREATE_TIME as ITEM_CREATE_TIME,
+			I.UPDATE_TIME as ITEM_UPDATE_TIME,
+			F.ID as TEMPLATE_DEFINE_ID,
+			F.NAME as TEMPLATE_DEFINE_NAME,
+			F.DESCRIPTION as TEMPLATE_DEFINE_DESCRIPTION,
+			F.TEMPLATE_TYPE as TEMPLATE_DEFINE_TYPE,
+			F.TEMPLATE_CONTENT as TEMPLATE_DEFINE_CONTENT,
+			T.ID as USER_ID,
+			T.NAME as USER_NAME,
+			T.EMAIL as USER_EMAIL,
+			T.PHONE as USER_PHONE,
+			T.WEIXIN as USER_WEIXIN,
+			T.BRANCH_NO as USER_BRANCH_NO,
+			T.HEAD_FLAG as USER_HEAD_FLAG,
+			T.SUPERIOR_NO as USER_SUPERIOR_NO,
+			E.ID AS EXECUTOR_ID,
+			E.NAME AS EXECUTOR_NAME,
+			E.DESCRIPTION AS EXECUTOR_DESCRIPTION,
+			E.EXECUTOR_TYPE AS EXECUTOR_TYPE,
+			E.EXECUTOR AS EXECUTOR_EXECUTOR,
+			E.EXECUTOR_RETURN AS EXECUTOR_RETURN_TYPE,
+			E.EXECUTOR_KEY AS EXECUTOR_KEY,
+			E.CREATE_TIME AS EXECUTOR_CREATE_TIME,
+			E.UPDATE_TIME AS EXECUTOR_UPDATE_TIME
+		FROM
+
+		    MAS_RULE_NOTIFY R
+		LEFT JOIN MAS_MONITOR_ITEM I
+			ON R.MONITOR_ITEM_ID = I.ID
+		LEFT JOIN MAS_NOTIFY_TEMPLATE F
+			ON R.TEMPLATE_ID = F.ID
+		LEFT JOIN MAS_EXECUTOR E
+    		ON E.ID=R.EXECUTOR_ID
+		LEFT JOIN (
+			SELECT
+				U.USERID AS ID,
+				U.USERNAME AS NAME,
+				U.EMAIL AS EMAIL,
+				U.MOBILE_NO AS PHONE,
+				U.POSTNO AS WEIXIN,
+				U.ORGID AS BRANCH_NO,
+				CASE WHEN b.BUSINESS_SUPERIOR is null or b.BUSINESS_SUPERIOR = '' THEN 1
+				ELSE 0 END as HEAD_FLAG,
+				b.BUSINESS_SUPERIOR as SUPERIOR_NO,
+				RE.RULE_ID
+			FROM MAS_NOTIFY_USER_REF RE, TL9_USERBASIC U
+			LEFT JOIN TL9_ORGBASIC b
+				ON U.ORGID = b.ORGID
+			WHERE RE.USER_ID=U.USERID
+			UNION
+			SELECT
+				U.USERID AS ID,
+				U.USERNAME AS NAME,
+				U.EMAIL AS EMAIL,
+				U.MOBILE_NO AS PHONE,
+				U.POSTNO AS WEIXIN,
+				U.ORGID AS BRANCH_NO,
+				CASE WHEN b.BUSINESS_SUPERIOR is null or b.BUSINESS_SUPERIOR = '' THEN 1
+				ELSE 0 END as HEAD_FLAG,
+				b.BUSINESS_SUPERIOR as SUPERIOR_NO,
+				RE.RULE_ID
+			FROM MAS_NOTIFY_USER_REF RE, TL9_USERROLE R, TL9_USERBASIC U
+			LEFT JOIN TL9_ORGBASIC b
+				ON U.ORGID = b.ORGID
+			WHERE RE.ROLE_ID = R.ROLEID AND R.USERID=U.USERID) T
+		ON T.RULE_ID = R.ID
+	</select>
+	<select id="getAllTemplateDefine" resultMap="templateDefineMap">
+		select
+		  ID as TEMPLATE_DEFINE_ID,
+		  NAME as TEMPLATE_DEFINE_NAME,
+		  DESCRIPTION as TEMPLATE_DEFINE_DESCRIPTION,
+		  TEMPLATE_TYPE as TEMPLATE_DEFINE_TYPE,
+		  TEMPLATE_CONTENT as TEMPLATE_DEFINE_CONTENT
+		from MAS_NOTIFY_TEMPLATE
+	</select>
+</mapper>

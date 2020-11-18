@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.CustFlowDataDao">
+    <!-- 管理机构、营业机构，查询条件片段 -->
+    <sql id="sqlByBrachStatsType">
+            <if test="branchStatsType!=0">
+                AND T.BRANCH_STATS_TYPE = #{branchStatsType}
+            </if>
+    </sql>
+    <sql id="_unio_where">
+        <if test="branchStatsType == 1">
+            AND 1!=1
+        </if>
+    </sql>
+    <!--日月季年补零select片段-->
+    <sql id="selectByZero">
+      SELECT time,
+       VALUE,
+       FLOOR(totalAvg),
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (VALUE, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.VALUE, 0) AS VALUE,
+           b.totalAvg AS totalAvg,
+           b.rate AS rate
+        FROM
+    </sql>
+    <sql id="selectForCompletionData">
+        <if test=" dateType == 'day'">
+			(SELECT TO_CHAR (TO_DATE (SUBSTR(#{timeValue}, 10), 'yyyyMMDD') -
+			(to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 ,8), 'yyyyMMDD' )+2)+ ROWNUM,
+			'yyyyMMDD')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 , 8), 'yyyyMMDD' )+2) a
+		</if>
+        <if test=" dateType == 'month'">
+            (SELECT TO_CHAR (
+            ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 13),
+            ROWNUM),
+            'yyyyMM')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 13) a
+        </if>
+        <if test=" dateType == 'quarter'">
+            (SELECT TO_CHAR (
+            ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 15),
+            3 * ROWNUM),
+            'yyyyMM')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 5) a
+        </if>
+        <if test=" dateType == 'year'">
+            (SELECT TO_CHAR (#{timeValue} - 4 + ROWNUM)
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 4) a
+        </if>
+    </sql>
+    <!--日月季年重复使用可回滚前片段-->
+    <sql id="sqlByZeroBefore">
+        left join (
+    </sql>
+    <!--日月季年重复使用可回滚后片段-->
+    <sql id="sqlByZeroAfter">
+        ) b
+    </sql>
+    <!--日月季年补零where片段-->
+    <sql id="whereByLeftJoin">
+        ON a.timelist = b.TIME
+            ORDER BY
+        a.timelist)
+    </sql>
+    <!--查询子机构的接待客户数排名-->
+    <!--子机构接待客户数的统计，年龄、资产、性别任意一类的表中代表的客户数据进行统计，默认选择年龄分类客流表中代表全部客户-->
+    <select id="getSubBranchCustFlowRank" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain" >
+        <if test="dateType == 'day' ">
+            SELECT t2.*, ROWNUM as rankNo
+            FROM (SELECT
+                    T.BRANCH_NO as branchNo,
+                    T.BRANCH_NAME as branchName,
+                    T.RECEIVE_COUNT as value ,
+                    T.RECEIVE_COUNT_T_AVG as totalAvg,
+                    T.RECEIVE_COUNT_RING as rate
+            FROM SB_STATS_GATHER_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			<if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+
+              ) t2  where ROWNUM  &lt; #{rownum}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT t2.*, ROWNUM as rankNo
+            FROM (SELECT   T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value ,
+            T.RECEIVE_COUNT_T_AVG as totalAvg,
+            T.RECEIVE_COUNT_RING as rate
+            FROM SB_STATS_GATHER_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+            ) t2 where ROWNUM  &lt; #{rownum}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT t2.*, ROWNUM as rankNo
+            FROM (SELECT   T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value ,
+            T.RECEIVE_COUNT_T_AVG as totalAvg,
+            T.RECEIVE_COUNT_RING as rate
+            FROM SB_STATS_GATHER_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_QUARTER = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+            ) t2 where ROWNUM  &lt; #{rownum}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT t2.*, ROWNUM as rankNo
+            FROM (SELECT   T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value ,
+            T.RECEIVE_COUNT_T_AVG as totalAvg,
+            T.RECEIVE_COUNT_RING as rate
+            FROM SB_STATS_GATHER_Y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YEAR = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+            ) t2 where ROWNUM  &lt; #{rownum}
+        </if>
+        <include refid="_unio_where"></include>
+    </select>
+
+    <!--全行接待客户数平均值的查询-->
+    <select id="getAvgCustFlowUnitNo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CustFlowDomain" >
+        SELECT  distinct FLOOR(NVL(t.RECEIVE_COUNT_T_AVG,0)) as totalAvg
+        <if test=" dateType == 'day'">
+            FROM SB_STATS_GATHER_D T           WHERE  T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+
+		</if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_GATHER_M T            WHERE T.Trade_Ym = #{timeValue}
+        </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_GATHER_Q T            WHERE T.Trade_Quarter=  #{timeValue}
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_GATHER_Y T            WHERE T.TRADE_YEAR =  #{timeValue}
+        </if>
+        <choose>
+            <when test="branchStatsType==1">
+                AND T.UNIT_NO = #{orgid}
+            </when>
+            <otherwise>
+                AND T.UNIT_NO = (select distinct BUSINESS_SUPERIOR from tl9_orgbasic  where orgid = #{orgid})
+            </otherwise>
+        </choose>
+    </select>
+
+    <!--全行接待客户数平均值的查询-->
+    <select id="getAvgCustFlow" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CustFlowDomain" >
+           SELECT  NVL(T.RECEIVE_COUNT,0) as receiveCount ,T.receive_count_ring as rate,
+                  NVL(t.RECEIVE_COUNT_T_AVG,0) as totalAvg
+       <if test=" dateType == 'day'">
+           FROM SB_STATS_GATHER_D T           WHERE T.BRANCH_NO = #{orgid}              AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+
+	   </if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_GATHER_M T            WHERE T.BRANCH_NO  = #{orgid}            AND T.Trade_Ym = #{timeValue}
+        </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_GATHER_Q T            WHERE T.BRANCH_NO  = #{orgid}            AND T.Trade_Quarter=  #{timeValue}
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_GATHER_Y T            WHERE T.BRANCH_NO  = #{orgid}            AND T.TRADE_YEAR =  #{timeValue}
+        </if>
+        <include refid="sqlByBrachStatsType"></include>
+    </select>
+    <!--查询客户流量每个指定时间类型内流量，使用基于年龄的统计规则进行统计 比如最近7天 最近12个月  最近三个季度 最近 三年-->
+    <select id="getCustFlowByTimeGroup" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        <if test=" dateType == 'day'">
+            SELECT
+                    T.RECEIVE_COUNT as value,
+                    T.TRADE_DATE as  time,
+                    T.RECEIVE_COUNT_T_AVG as totalAvg,
+                    T.RECEIVE_COUNT_RING as rate
+            FROM sb_stats_gather_d T   WHERE  TO_DATE(t.TRADE_DATE,'YYYYMMdd') BETWEEN
+			ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+            AND T.BRANCH_NO=#{orgid}
+            <include refid="sqlByBrachStatsType"/>
+            ORDER BY T.TRADE_DATE
+        </if>
+        <if test=" dateType == 'month'">
+            SELECT
+            T.RECEIVE_COUNT as value,
+            T.TRADE_ym as  time,
+            T.RECEIVE_COUNT_T_AVG as totalAvg,
+            T.RECEIVE_COUNT_RING as rate
+            FROM sb_stats_gather_m T    WHERE  TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'yyyymm'),-13) AND TO_DATE(#{timeValue},'YYYYMM')
+            AND T.BRANCH_NO=#{orgid}
+            <include refid="sqlByBrachStatsType"/>
+            ORDER BY T.TRADE_YM
+        </if>
+        <if test=" dateType == 'quarter'">
+            SELECT
+            T.RECEIVE_COUNT as value,
+            T.TRADE_quarter as  time,
+            T.RECEIVE_COUNT_T_AVG as totalAvg,
+            T.RECEIVE_COUNT_RING as rate
+            FROM sb_stats_gather_q T   WHERE   TO_DATE(t.TRADE_QUARTER,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'yyyymm'),-15) AND TO_DATE(#{timeValue},'YYYYMM')
+            AND T.BRANCH_NO=#{orgid}
+            <include refid="sqlByBrachStatsType"/>
+            ORDER BY T.TRADE_QUARTER
+        </if>
+        <if test=" dateType == 'year'">
+            SELECT
+            T.RECEIVE_COUNT as value,
+            T.TRADE_year as  time,
+            T.RECEIVE_COUNT_T_AVG as totalAvg,
+            T.RECEIVE_COUNT_RING as rate
+            FROM sb_stats_gather_y T   WHERE    to_number(T.TRADE_YEAR ) BETWEEN to_number(#{timeValue})-4 and to_number(#{timeValue} )
+            AND T.BRANCH_NO=#{orgid}
+            <include refid="sqlByBrachStatsType"/>
+            ORDER BY T.TRADE_YEAR
+        </if>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+    <!--查询对公客户客户流量的变化-->
+    <select id="getCustFlowForCustType" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CustFlowDomain">
+        select timeStep,receiveCount from (
+        SELECT T.time_step_desc AS timeStep,
+        sum(T.RECEIVE_COUNT) AS receiveCount
+        <if test=" dateType == 'day'">
+            FROM SB_STATS_ENT_TIME_D T
+            WHERE T.customer_class  = #{custType}
+            AND T.BRANCH_NO=#{orgid}
+            AND   T.TRADE_date = to_number(SUBSTR(#{timeValue}, 10))
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_ENT_TIME_M T
+            WHERE T.customer_class = #{custType}
+            AND T.BRANCH_NO=#{orgid}
+            AND   T.TRADE_YM = #{timeValue}
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_ENT_TIME_Q T            WHERE T.customer_class = #{custType}            AND T.BRANCH_NO=#{orgid}
+            AND T.TRADE_QUARTER = #{timeValue}
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_ENT_TIME_Y T            WHERE T.customer_class = #{custType}            AND T.BRANCH_NO=#{orgid}
+            AND T.TRADE_YEAR = #{timeValue}
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+    </select>
+
+    <!--查询对私客户客户流量的变化-->
+    <select id="getCustFlowForCustTypeForPrivate" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CustFlowDomain">
+
+        select timeStep,receiveCount from (
+            SELECT T.time_step_desc AS timeStep,
+            sum(T.RECEIVE_COUNT) AS receiveCount
+        <if test=" dateType == 'day'">
+            FROM SB_STATS_ENT_TIME_D T
+            WHERE T.customer_class  != #{custType}
+            AND T.BRANCH_NO=#{orgid}
+            AND   T.TRADE_date = to_number(SUBSTR(#{timeValue}, 10))
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_ENT_TIME_M T
+            WHERE T.customer_class != #{custType}
+            AND T.BRANCH_NO=#{orgid}
+            AND   T.TRADE_YM = #{timeValue}
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_ENT_TIME_Q T            WHERE T.customer_class != #{custType}            AND T.BRANCH_NO=#{orgid}
+            AND T.TRADE_QUARTER = #{timeValue}
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_ENT_TIME_Y T            WHERE T.customer_class != #{custType}            AND T.BRANCH_NO=#{orgid}
+            AND T.TRADE_YEAR = #{timeValue}
+            <include refid="sqlByBrachStatsType"/>
+            group by T.time_step_desc) t
+            ORDER BY substr(t.timeStep,-5,2)
+        </if>
+    </select>
+    <select id="getCustFlowBySex" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+            SELECT
+                   T.SEX_desc AS sexStep,
+                   T.RECEIVE_COUNT
+        <if test=" dateType == 'day'">
+            FROM SB_STATS_ENT_SEX_D T            WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_ENT_SEX_M T            WHERE T.TRADE_YM =  #{timeValue}              AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_ENT_SEX_Q T            WHERE T.TRADE_QUARTER =  #{timeValue}            AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_ENT_SEX_Y T            WHERE T.TRADE_YEAR =  #{timeValue}            AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="sqlByBrachStatsType"/>
+    </select>
+    <select id="getCustFlowByAge" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+            SELECT       T.age_step_desc AS ageGroup,   T.RECEIVE_COUNT
+        <if test=" dateType == 'day'">
+            FROM SB_STATS_ENT_AGE_D T      WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_ENT_AGE_M t    WHERE T.TRADE_YM =  #{timeValue}       AND T.BRANCH_NO = #{orgid}
+    </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_ENT_AGE_Q T      WHERE T.TRADE_QUARTER = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_ENT_AGE_Y T      WHERE T.TRADE_YEAR =  #{timeValue}     AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="sqlByBrachStatsType"/>
+        order by t.customer_age_step
+    </select>
+    <select id="getCustFlowByAssets"  parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+            SELECT            T.balance_step_desc as assetGroup,            T.RECEIVE_COUNT
+        <if test=" dateType == 'day'">
+            FROM SB_STATS_ENT_ASSET_D T            WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'month'">
+            FROM SB_STATS_ENT_ASSET_M T            WHERE T.TRADE_YM =  #{timeValue}            AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'quarter'">
+            FROM SB_STATS_ENT_ASSET_Q T            WHERE T.TRADE_QUARTER =  #{timeValue}            AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType == 'year'">
+            FROM SB_STATS_ENT_ASSET_y T            WHERE T.TRADE_YEAR =  #{timeValue}            AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="sqlByBrachStatsType"/>
+    </select>
+    <select id="getPublicCount"  parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <if test=" dateType == 'day'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_D T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            AND T.CUSTOMER_CLASS = #{custType}
+        </if>
+        <if test=" dateType == 'month'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_M T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            AND T.CUSTOMER_CLASS = #{custType}
+        </if>
+        <if test=" dateType == 'quarter'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_q T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            AND T.CUSTOMER_CLASS = #{custType}
+        </if>
+        <if test=" dateType == 'year'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_y T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_year = #{timeValue}
+            AND T.CUSTOMER_CLASS = #{custType}
+        </if>
+        <include refid="sqlByBrachStatsType"></include>
+    </select>
+
+    <select id="getPrivateCount"  parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        <if test=" dateType == 'day'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_D T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            AND T.CUSTOMER_CLASS != #{custType}
+        </if>
+        <if test=" dateType == 'month'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_M T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            AND T.CUSTOMER_CLASS != #{custType}
+        </if>
+        <if test=" dateType == 'quarter'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_q T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            AND T.CUSTOMER_CLASS != #{custType}
+        </if>
+        <if test=" dateType == 'year'">
+            SELECT SUM(T.RECEIVE_COUNT) AS CUSTSUM
+            FROM SB_STATS_ENT_TIME_y T
+            WHERE T.BRANCH_NO = #{orgid}
+            AND T.TRADE_year = #{timeValue}
+            AND T.CUSTOMER_CLASS != #{custType}
+        </if>
+        <include refid="sqlByBrachStatsType"></include>
+    </select>
+</mapper>

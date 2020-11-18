@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.MonitorBusyDao">
+    <!-- 繁忙度汇总信息结果集 -->
+    <resultMap id="busy_gather_info" type="com.dcfs.smartaibank.manager.monitor.web.domian.BusyGatherInfo">
+        <result property="waitingCustomers" column="wait_count"></result>
+        <result property="avgWindowWaitingCustomers" column="avg_wait_count_win"></result>
+        <result property="avgWaitingTime" column="avg_wait_time"></result>
+        <result property="maxWaitingTime" column="max_wait_time"></result>
+        <result property="openWindowsCount" column="work_windows_number"></result>
+        <result property="unopenedWindowsCount" column="idle_windows_number"></result>
+        <result property="totalCount" column="total_count"></result>
+        <result property="saturationCount" column="warn_branch_count"></result>
+        <result property="saturationRate" column="WARN_BRANCH_rate"></result>
+        <result property="busyCount" column="busy_branch_count"></result>
+        <result property="busyRate" column="BUSY_BRANCH_rate"></result>
+        <result property="normalCount" column="normal_branch_count"></result>
+        <result property="normalRate" column="NORMAL_BRANCH_rate"></result>
+        <result property="idleCount" column="idle_branch_count"></result>
+        <result property="idleRate" column="IDLE_BRANCH_rate"></result>
+        <result property="unopenedCount" column="unopen_branch_count"></result>
+        <result property="unopenedRate" column="UNOPEN_BRANCH_rate"></result>
+        <result property="maxWaitingTimeBranchId" column="branch_no"></result>
+        <result property="maxWaitingTimeBranchName" column="orgname_cn"></result>
+    </resultMap>
+    <!-- 繁忙度详情列表结果集 -->
+    <resultMap id="busy_detail_list" type="com.dcfs.smartaibank.manager.monitor.web.domian.BusyDetails">
+        <result property="branchId" column="BRANCH_NO"></result>
+        <result property="branchName" column="ORGNAME_CN"></result>
+        <result property="status" column="BUSI_STATUS"></result>
+        <result property="statusDesc" column="BUSI_STATUS_DESC"></result>
+        <result property="waitingCustomers" column="WAIT_COUNT"></result>
+        <result property="avgWindowWaitingCustomers" column="AVG_WAIT_COUNT_WIN"></result>
+        <result property="avgWaitingTime" column="AVG_WAIT_TIME"></result>
+        <result property="maxWaitingTime" column="MAX_WAIT_TIME"></result>
+    </resultMap>
+    <resultMap id="business_type_detail_list" type="com.dcfs.smartaibank.manager.monitor.web.domian.BusinessTypeDetail">
+        <result property="businessTypeId" column="QUEUE_NO"></result>
+        <result property="businessTypeName" column="QUEUE_NAME"></result>
+        <result property="parentBusinessTypeId" column="SUPER_QUEUE_NO"></result>
+        <result property="waitingCustomerCount" column="CUSCOUNT"></result>
+        <result property="avgWaitingTime" column="WAIT_TIME_AVG"></result>
+        <collection property="windowList" ofType="com.dcfs.smartaibank.manager.monitor.web.domian.ManageableWindow">
+            <result property="windowId" column="WINDOW_NO"></result>
+            <result property="windowName" column="WINDOW_NAME"></result>
+        </collection>
+    </resultMap>
+    <!-- 繁忙度汇总信息字段（各状态数量及占比、等待客户数等信息） -->
+    <sql id="busy_gather_column">
+       a.wait_count,
+       a.avg_wait_count_win,
+       a.avg_wait_time,
+       a.max_wait_time,
+       a.work_windows_number,
+       a.idle_windows_number,
+       a.unopen_branch_count,
+       a.normal_branch_count,
+       a.idle_branch_count,
+       a.busy_branch_count,
+       a.warn_branch_count,
+       a.total_count,
+       c.branch_no,
+       c.orgname_cn,
+       CASE total_count
+          WHEN 0 THEN 0
+          ELSE ROUND (unopen_branch_count / total_count, 4) * 100
+       END
+          UNOPEN_BRANCH_rate,
+       CASE total_count
+          WHEN 0 THEN 0
+          ELSE ROUND (normal_branch_count / total_count, 4) * 100
+       END
+          NORMAL_BRANCH_rate,
+       CASE total_count
+          WHEN 0 THEN 0
+          ELSE ROUND (idle_branch_count / total_count, 4) * 100
+       END
+          IDLE_BRANCH_rate,
+       CASE total_count
+          WHEN 0 THEN 0
+          ELSE ROUND (busy_branch_count / total_count, 4) * 100
+       END
+          BUSY_BRANCH_rate,
+       CASE total_count
+          WHEN 0 THEN 0
+          ELSE ROUND (warn_branch_count / total_count, 4) * 100
+       END
+          WARN_BRANCH_rate
+    </sql>
+    <sql id="monitor_busy_org_tree_where">
+        f.branch_no IN
+                (    SELECT orgid
+                        FROM tl9_orgbasic o
+                        START WITH o.orgid = #{branchId,jdbcType=VARCHAR}
+                        AND o.orgstatustypeid != '0'
+                        CONNECT BY o.BUSINESS_SUPERIOR = PRIOR o.orgid
+                        AND o.orgstatustypeid != '0')
+    </sql>
+    <!-- 根据指定机构查询子结构条件 -->
+    <sql id="monitor_busy_org_where">
+        <choose>
+            <when test="branchStatsType == 1">
+                f.branch_no = #{branchId,jdbcType=VARCHAR}
+            </when>
+            <otherwise>
+                <include refid="monitor_busy_org_tree_where"></include>
+            </otherwise>
+        </choose>
+    </sql>
+    <!-- 繁忙度汇总信息（各状态数量及等待客户数等信息）-->
+    <sql id="select_gather_count">
+        SELECT SUM (wait_count) AS wait_count,
+        CASE SUM (work_windows_number)
+        WHEN 0
+        THEN
+        0
+        ELSE
+        TRUNC (SUM (wait_count) / SUM (work_windows_number))
+        END
+        avg_wait_count_win,
+        CASE SUM (wait_count)
+        WHEN 0 THEN 0
+        ELSE TRUNC (SUM (total_wait_time) / SUM (wait_count))
+        END
+        avg_wait_time,
+        MAX (max_wait_time) max_wait_time,
+        SUM (work_windows_number) work_windows_number,
+        SUM (idle_windows_number) idle_windows_number,
+        COUNT (1) total_count,
+        COUNT (CASE busi_status WHEN '0' THEN 1 ELSE NULL END)
+        UNOPEN_BRANCH_COUNT,
+        COUNT (CASE busi_status WHEN '1' THEN 1 ELSE NULL END)
+        IDLE_BRANCH_COUNT,
+        COUNT (CASE busi_status WHEN '2' THEN 1 ELSE NULL END)
+        NORMAL_BRANCH_COUNT,
+        COUNT (CASE busi_status WHEN '3' THEN 1 ELSE NULL END)
+        BUSY_BRANCH_COUNT,
+        COUNT (CASE busi_status WHEN '4' THEN 1 ELSE NULL END)
+        WARN_BRANCH_COUNT
+        FROM MAS_QUEUE_BRANCH_F f
+        WHERE
+        <include refid="monitor_busy_org_where"></include>
+    </sql>
+    <!-- 查询客户最长等待时间相对应的机构信息 -->
+    <sql id="select_one_org_info">
+        SELECT b.branch_no, b.ORGNAME_CN
+        FROM (SELECT f.branch_no,
+        org.ORGNAME_CN,
+        ROW_NUMBER ()
+        OVER (ORDER BY max_wait_time DESC,avg_wait_time DESC NULLS LAST)
+        r
+        FROM MAS_QUEUE_BRANCH_F f, tl9_orgbasic org
+        WHERE f.branch_no = org.orgid
+        AND <include refid="monitor_busy_org_where"></include>) b
+        WHERE b.r = 1
+    </sql>
+    <!-- 繁忙度详情列表查询条件（分状态：所有，未营业，空闲，正常，忙碌，饱和） -->
+    <sql id="busy_details_status_condition">
+      <if test="not @com.dcfs.smartaibank.manager.monitor.web.enums.BusyStatusEnum@isEquals('ALL',busyStatus)">
+        AND temp.BUSI_STATUS = #{busyStatus,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.BusyStatusEnum,typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+      </if>
+    </sql>
+    <!-- 繁忙度详情查询排序条件：繁忙度状态、等待客户数排序、窗口平均等待客户数排序、客户平均等待时间排序、客户平均等待时间排序 -->
+    <sql id="busy_detail_order_rule">
+        <choose>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.BusyDetailsSortRuleEnum@isEquals('BUSY_STATUS',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.BUSI_STATUS desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.BUSI_STATUS asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.BusyDetailsSortRuleEnum@isEquals('WAIT_COUNT',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.WAIT_COUNT desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.WAIT_COUNT asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.BusyDetailsSortRuleEnum@isEquals('AVG_WAIT_COUNT_WIN',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.AVG_WAIT_COUNT_WIN desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.AVG_WAIT_COUNT_WIN asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.BusyDetailsSortRuleEnum@isEquals('AVG_WAIT_TIME',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.AVG_WAIT_TIME desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.AVG_WAIT_TIME asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.BusyDetailsSortRuleEnum@isEquals('MAX_WAIT_TIME',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.MAX_WAIT_TIME desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.MAX_WAIT_TIME asc
+                    </otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                ORDER BY org.ROWID
+            </otherwise>
+        </choose>
+    </sql>
+    <!-- 繁忙度汇总信息查询 -->
+    <select id="selectBusyGatherInfo" resultMap="busy_gather_info">
+        SELECT
+        <include refid="busy_gather_column"></include>
+        FROM
+        (<include refid="select_gather_count"></include> ) a
+        LEFT JOIN
+        (<include refid="select_one_org_info"></include>) c
+        ON 1 = 1
+    </select>
+    <!-- 查询繁忙度详情列表信息 -->
+    <select id="selectBusyDetailsByBranchId" resultMap="busy_detail_list">
+          SELECT temp.BRANCH_NO,
+                 ORG.ORGNAME_CN,
+                 temp.BUSI_STATUS,
+                 CASE
+                    WHEN temp.BUSI_STATUS = '0' THEN '未营业'
+                    WHEN temp.BUSI_STATUS = '1' THEN '空闲'
+                    WHEN temp.BUSI_STATUS = '2' THEN '正常'
+                    WHEN temp.BUSI_STATUS = '3' THEN '忙碌'
+                    WHEN temp.BUSI_STATUS = '4' THEN '饱和'
+                 END
+                    AS BUSI_STATUS_DESC,
+                 temp.WAIT_COUNT,
+                 temp.AVG_WAIT_COUNT_WIN,
+                 temp.AVG_WAIT_TIME,
+                 temp.MAX_WAIT_TIME
+            FROM    tl9_orgbasic org
+                 LEFT OUTER JOIN
+                    (SELECT f.BRANCH_NO,
+                            f.BUSI_STATUS,
+                            f.WAIT_COUNT,
+                            f.AVG_WAIT_COUNT_WIN,
+                            f.AVG_WAIT_TIME,
+                            f.MAX_WAIT_TIME
+                       FROM MAS_QUEUE_BRANCH_F f
+                      WHERE <include refid="monitor_busy_org_tree_where"></include>
+                      ) temp
+                 ON org.ORGID = temp.BRANCH_NO
+           WHERE temp.BRANCH_NO IS NOT NULL
+           <include refid="busy_details_status_condition"></include>
+        <include refid="busy_detail_order_rule"></include>
+    </select>
+    <!-- 查询繁忙度机构数量（不包含未开门的机构） -->
+    <select id="selectBusyOrgCount" parameterType="string" resultType="int">
+        SELECT COUNT (1) AS busyOrgCount
+          FROM MAS_QUEUE_BRANCH_F f
+         WHERE f.BUSI_STATUS != 0
+            AND <include refid="monitor_busy_org_tree_where"></include>
+    </select>
+    <!-- 查询繁忙度排名信息（排序规则：等待客户数、客户平均等待时间；排序顺序：升序、降序） -->
+    <select id="selectBusynessRankList" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.BusyDetails">
+        SELECT BRANCH_NO as branchId,
+            orgname_cn as branchName,
+            WAIT_COUNT as waitingCustomers,
+            AVG_WAIT_TIME as avgWaitingTime
+        FROM (  SELECT f.*, b.orgname_cn
+          FROM MAS_QUEUE_BRANCH_F f, tl9_orgbasic b
+          WHERE f.branch_no = b.orgid AND f.BUSI_STATUS != 0
+            AND <include refid="monitor_busy_org_tree_where"></include>
+            <choose>
+                <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.BusyRankQueryConditionEnum@isEquals('WAIT_COUNT',sortRule)">
+                    ORDER BY f.WAIT_COUNT
+                </when>
+                <otherwise>
+                    ORDER BY f.AVG_WAIT_TIME
+                </otherwise>
+            </choose>
+            <choose>
+                <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                    DESC ,BRANCH_NO DESC
+                </when>
+                <otherwise>
+                    ASC ,BRANCH_NO ASC
+                </otherwise>
+            </choose>
+             )
+        WHERE ROWNUM &lt;= #{queryNumbers}
+    </select>
+    <!-- 查询营业机构繁忙度排队等待时长（10分钟以下，10-20分钟，20-30分钟，30分钟以上） -->
+    <select id="selectBusynessWaitingTimeDistribution" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.BusyWaitTimeDistribution">
+        SELECT temp_count.LESS_TEN_MIN_COUNT as lessThanTenMinCount,
+            temp_count.BETWEEN_TEN_TWENTY_COUNT as betweenTenAndTwentyMinCount,
+            temp_count.BETWEEN_TWENTY_THIRTY_COUNT as betweenTwentyAndThirtyMinCount,
+            temp_count.MORE_THIRTY_COUNT as moreThanThirtyMinCount,
+            temp_count.TOTAL_COUNT as totalCount,
+            CASE temp_count.TOTAL_COUNT
+                WHEN 0 THEN 0 ELSE ROUND (temp_count.LESS_TEN_MIN_COUNT / temp_count.TOTAL_COUNT,4) * 100
+               END lessThanTenMinRate,
+            CASE temp_count.TOTAL_COUNT
+              WHEN 0 THEN 0 ELSE ROUND (temp_count.BETWEEN_TEN_TWENTY_COUNT / temp_count.TOTAL_COUNT, 4) * 100
+            END betweenTenAndTwentyMinRate,
+            CASE temp_count.TOTAL_COUNT
+              WHEN 0 THEN 0 ELSE ROUND ( temp_count.BETWEEN_TWENTY_THIRTY_COUNT/ temp_count.TOTAL_COUNT, 4) * 100
+            END betweenTwentyAndThirtyMinRate,
+            CASE temp_count.TOTAL_COUNT
+              WHEN 0 THEN 0 ELSE ROUND (temp_count.MORE_THIRTY_COUNT / temp_count.TOTAL_COUNT, 4) * 100
+            END moreThanThirtyMinRate
+        FROM (
+                SELECT COUNT (1) AS TOTAL_COUNT,
+                    COUNT ( CASE WHEN temp_origin.wait_time &lt; 600 THEN 1 ELSE NULL END) LESS_TEN_MIN_COUNT,
+                    COUNT ( CASE WHEN temp_origin.wait_time &gt;= 600 AND temp_origin.wait_time &lt; 1200 THEN 1 ELSE NULL END) BETWEEN_TEN_TWENTY_COUNT,
+                    COUNT ( CASE WHEN temp_origin.wait_time &gt;= 1200 AND temp_origin.wait_time &lt; 1800 THEN 1 ELSE NULL END) BETWEEN_TWENTY_THIRTY_COUNT,
+                    COUNT ( CASE WHEN temp_origin.wait_time &gt;= 1800 THEN 1 ELSE NULL END) MORE_THIRTY_COUNT
+                FROM (
+                      SELECT cb.seq_no, cb.wait_time
+                        FROM MAS_QUEUE_BUSI_INFO CB
+                        WHERE CB.QUEUE_STATUS != '0' AND CB.BRANCH_NO = #{branchId,jdbcType=VARCHAR}
+                            <if test="customerInfo.customerClassEnum != null">
+                                AND CB.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                                <if test="customerInfo.customerTypeEnum != null">
+                                    AND CB.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                                </if>
+                            </if>
+                      UNION
+                      SELECT cb.seq_no,
+                        (SYSDATE - TO_DATE ('1970-01-01', 'yyyy-mm-dd hh24:mi:ss')) * 24 * 60 * 60 - cb.apply_time AS WAIT_TIME
+                        FROM MAS_QUEUE_BUSI_INFO CB
+                        WHERE CB.queue_status = '0' AND CB.BRANCH_NO = #{branchId,jdbcType=VARCHAR}
+                            <if test="customerInfo.customerClassEnum != null">
+                                AND CB.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                                <if test="customerInfo.customerTypeEnum != null">
+                                    AND CB.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                                </if>
+                            </if>
+                      ) temp_origin
+              ) temp_count
+    </select>
+    <!-- 查询营业机构繁忙度分业务类型繁忙度详情（等待客户数，客户平均等待时间，可办理窗口）
+        1.temp1查询的是当前机构下所配置的业务类型对应的繁忙度详情（等待客户数、客户平均等待时间、排队业务上级类型（个人/公司）），
+          如果业务类型下没有等待客户数和平均等待时间，初始化为0
+        2.temp2查询的是当前机构下配置的业务类型对应的可办理业务窗口信息
+        3.将temp1和temp2进行左外合并得到繁忙度详情（等待客户数，客户平均等待时间，可办理窗口）
+    -->
+    <select id="selectBusyBusinessTypeDistribution" resultMap="business_type_detail_list">
+        SELECT temp1.QUEUE_NO,
+               temp1.QUEUE_NAME,
+               temp1.SUPER_QUEUE_NO,
+               temp1.CUSCOUNT,
+               temp1.WAIT_TIME_AVG,
+               temp2.WINDOW_NO,
+               temp2.WINDOW_NAME
+          FROM    (SELECT tk.QUEUE_NO,
+                          tk.SUPER_QUEUE_NO,
+                          tk.QUEUE_NAME,
+                          NVL (b.CUSCOUNT, 0) AS CUSCOUNT,
+                          NVL (b.WAIT_TIME_AVG, 0) AS WAIT_TIME_AVG
+                     FROM    (SELECT ty.QUEUE_NO, ty.QUEUE_NAME, ty.SUPER_QUEUE_NO
+                                FROM TL9_QU_QUEUE_TYPE ty, TL9_QU_QUEUE_BRANCH_REL tb
+                               WHERE tb.BRANCH_NO = #{branchId,jdbcType=VARCHAR}
+                                     AND (ty.SUPER_QUEUE_NO = 'A'
+                                          OR ty.SUPER_QUEUE_NO = 'B')
+                                     AND ty.QUEUE_NO = tb.QUEUE_NO) tk
+                          LEFT JOIN
+                             (  SELECT CB.QUEUE_FLAG,
+                                       CB.PARENT_QUEUE_FLAG,
+                                       COUNT (1) CUSCOUNT,
+                                       CASE COUNT (1)
+                                          WHEN 0
+                                          THEN
+                                             0
+                                          ELSE
+                                             TRUNC (
+                                                SUM (
+                                                   ( (SYSDATE
+                                                      - TO_DATE (
+                                                           '1970-01-01',
+                                                           'yyyy-mm-dd hh24:mi:ss'))
+                                                    * 3600
+                                                    * 24)
+                                                   - APPLY_TIME)
+                                                / COUNT (1)
+                                                / 60)
+                                       END
+                                          WAIT_TIME_AVG
+                                  FROM MAS_QUEUE_BUSI_INFO Cb
+                                 WHERE CB.BRANCH_NO = #{branchId,jdbcType=VARCHAR} AND CB.queue_status = '0'
+                              GROUP BY CB.PARENT_QUEUE_FLAG, CB.QUEUE_FLAG) b
+                          ON b.QUEUE_FLAG = tk.QUEUE_NO) temp1
+               LEFT JOIN
+                  (  SELECT CL.WINDOW_NO,
+                            CL.WINDOW_NAME,
+                            CF.SUPER_QUEUE_NO,
+                            CF.QUEUE_NO
+                       FROM TL9_SM_BRANCH_WIN_BUSI_INFO CL
+                            LEFT JOIN TL9_QU_WIN_BUSI_REL CD
+                               ON CD.WINDOW_NO = CL.WINDOW_NO
+                                  AND CL.WIN_BRCH_NO = CD.BRANCH_NO
+                            LEFT JOIN TL9_QU_QUEUE_TYPE CF
+                               ON CD.QUEUE_NO = CF.QUEUE_NO
+                      WHERE     CL.ONOFFSIGN = '1'
+                            AND CL.WINDOW_STATUS = '1'
+                            AND CL.WIN_BRCH_NO = #{branchId,jdbcType=VARCHAR}
+                   GROUP BY CL.WINDOW_NO,
+                            CL.WINDOW_NAME,
+                            CF.QUEUE_NO,
+                            CF.SUPER_QUEUE_NO,
+                            CF.QUEUE_NAME) temp2
+               ON temp1.QUEUE_NO = temp2.QUEUE_NO
+                  AND temp1.SUPER_QUEUE_NO = temp2.SUPER_QUEUE_NO
+    </select>
+    <!-- 查询机构当天的营业时间(机构如果没有设置营业时间，则查询总行的营业时间) -->
+    <select id="selectOrgBusinessHoursByBranchId" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.OrgBusinessHours">
+        SELECT temp.BRANCH_NO as branchId, tt.WORK_OPEN_TIME as startTime, tt.WORK_CLOSE_TIME as endTime
+          FROM    (SELECT a.orgid AS BRANCH_NO, cal.CALENDAR_TYPE
+                     FROM    (  SELECT org.ORGID
+                                  FROM TL9_ORGBASIC org
+                                 WHERE org.BUSINESS_SUPERIOR IS NULL
+                                       OR ORG.ORGID = #{branchId}
+                              ORDER BY ORG.ORGLEVELID DESC) a
+                          LEFT JOIN
+                             TL9_QU_WORK_CALENDAR cal
+                          ON     CAL.CALENDAR_YEAR = #{currentYear}
+                             AND CAL.CALENDAR_MONTH = #{currentMonth}
+                             AND CAL.CALENDAR_DAY = #{currentDay}
+                             AND a.ORGID = cal.BRANCH_NO) temp
+               RIGHT JOIN
+                  TL9_QU_BRANCH_TIME tt
+               ON tt.BRANCH_NO = temp.BRANCH_NO
+                  AND tt.CALENDER_TYPE = temp.CALENDAR_TYPE
+         WHERE temp.CALENDAR_TYPE IS NOT NULL AND ROWNUM = 1
+
+    </select>
+    <!-- 查询监控分时段繁忙度信息（等待客户数、客户平均等待时间） -->
+    <select id="selectPhasedBusyInfoBeforeCurrentTime" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TimePhasedBusinessInfo">
+        SELECT t1.endTime,t1.callCustomers,t2.applyCustomers FROM
+            ( SELECT TO_CHAR (d.dt, 'hh24:mi') AS endTime,
+                COUNT (f.SEQ_NO) AS callCustomers
+            FROM(
+                    SELECT TO_DATE (#{endDateTime}, 'yyyy-mm-dd hh24:mi:ss') - (LEVEL - 1) / 24 / 60 * ${interval} AS dt
+                    FROM DUAL CONNECT BY LEVEL &lt;= #{showLength}
+                    ) d
+            LEFT JOIN
+                MAS_QUEUE_BUSI_INFO f
+            ON <include refid="monitor_busy_org_where"></include>
+                <if test="customerInfo.customerClassEnum != null">
+                    AND f.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                    <if test="customerInfo.customerTypeEnum != null">
+                        AND f.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                    </if>
+                </if>
+                AND (f.CALL_TIME / (24 * 60 * 60) + TO_DATE ('1970-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')) &lt; d.dt
+                AND (f.CALL_TIME / (24 * 60 * 60) + TO_DATE ('1970-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')) >= d.dt - 1 / 24 / 60 * ${interval}
+            GROUP BY d.dt
+            ORDER BY d.dt) t1
+        LEFT JOIN
+        ( SELECT TO_CHAR (d.dt, 'hh24:mi') AS endTime,
+            COUNT (f.SEQ_NO) AS applyCustomers
+            FROM(
+            SELECT TO_DATE (#{endDateTime}, 'yyyy-mm-dd hh24:mi:ss') - (LEVEL - 1) / 24 / 60 * ${interval} AS dt
+            FROM DUAL CONNECT BY LEVEL &lt;= #{showLength}
+            ) d
+            LEFT JOIN
+            MAS_QUEUE_BUSI_INFO f
+            ON <include refid="monitor_busy_org_where"></include>
+            <if test="customerInfo.customerClassEnum != null">
+                AND f.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                <if test="customerInfo.customerTypeEnum != null">
+                    AND f.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                </if>
+            </if>
+            AND (f.APPLY_TIME / (24 * 60 * 60) + TO_DATE ('1970-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')) &lt; d.dt
+            AND (f.APPLY_TIME / (24 * 60 * 60) + TO_DATE ('1970-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss')) >= d.dt - 1 / 24 / 60 * ${interval}
+            GROUP BY d.dt
+            ORDER BY d.dt) t2
+        ON t1.endTime=t2.endTime
+    </select>
+    <!-- 查询当前时间段内的繁忙度信息 -->
+    <select id="selectCurrentTimePhasedBusyInfo" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TimePhasedBusinessInfo">
+        SELECT TO_CHAR (TO_DATE ( #{endDateTime},'yyyy-mm-dd hh24:mi:ss'), 'hh24:mi') AS endTime,
+          CASE COUNT (temp.SEQ_NO) WHEN 0 THEN 0 ELSE TRUNC (SUM (temp.WAIT_TIME) / COUNT (temp.SEQ_NO) / 60) END avgWaitingTime,
+               COUNT (temp.SEQ_NO) AS waitingCustomers
+          FROM (SELECT F.SEQ_NO,
+                       ( ( (SYSDATE - TO_DATE ('1970-01-01', 'yyyy-mm-dd hh24:mi:ss')) * 3600 * 24) - APPLY_TIME) AS wait_time
+                  FROM MAS_QUEUE_BUSI_INFO f
+                 WHERE <include refid="monitor_busy_org_where"></include>
+                      AND F.QUEUE_STATUS = '0'
+                    <if test="customerInfo.customerClassEnum != null">
+                        AND f.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                        <if test="customerInfo.customerTypeEnum != null">
+                            AND f.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                        </if>
+                    </if>
+                UNION
+                SELECT F.SEQ_NO, F.WAIT_TIME * 60 AS WAIT_TIME
+                  FROM MAS_QUEUE_BUSI_INFO f
+                 WHERE
+                    (f.CALL_TIME / (24 * 60 * 60) + TO_DATE ('1970-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss'))
+                      BETWEEN TO_DATE (#{beginDateTime},'yyyy-mm-dd hh24:mi:ss') AND TO_DATE ( #{endDateTime},'yyyy-mm-dd hh24:mi:ss')
+                    <if test="customerInfo.customerClassEnum != null">
+                        AND f.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                        <if test="customerInfo.customerTypeEnum != null">
+                            AND f.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                        </if>
+                    </if>
+                    AND <include refid="monitor_busy_org_where"></include>
+                ) temp
+    </select>
+    <!-- 查询支行繁忙度按客户类型统计的等待客户数、客户平均等待时间 -->
+    <select id="selectBusyWaitCustomersAndTimeByCustType" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.BusyCustGatherInfoInCustType">
+        SELECT COUNT (temp.seq_no) AS waitingCustomers,
+               CASE COUNT (temp.SEQ_NO)
+                  WHEN 0 THEN 0
+                  ELSE TRUNC (SUM (temp.WAIT_TIME) / COUNT (temp.SEQ_NO) / 60)
+               END
+                  avgWaitingTime
+          FROM (SELECT cb.seq_no,
+                         (SYSDATE - TO_DATE ('1970-01-01', 'yyyy-mm-dd hh24:mi:ss'))
+                       * 24
+                       * 60
+                       * 60
+                       - cb.apply_time
+                          AS WAIT_TIME
+                  FROM MAS_QUEUE_BUSI_INFO CB
+                 WHERE CB.queue_status = '0' AND CB.BRANCH_NO = #{branchId}
+                        <if test="customerInfo.customerClassEnum != null">
+                            AND CB.CUSTOMER_CLASS = #{customerInfo.customerClassEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerClassEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                            <if test="customerInfo.customerTypeEnum != null">
+                                AND CB.CUSTOMER_TYPE = #{customerInfo.customerTypeEnum,javaType=com.dcfs.smartaibank.manager.monitor.web.enums.CustomerTypeEnum, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+                            </if>
+                        </if>
+                ) temp
+    </select>
+    <!-- 查询支行按客户类型统计的可办理窗口信息 -->
+    <select id="selectTransactableWindows" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ManageableWindow">
+          SELECT CL.WINDOW_NO as windowId,
+                 CL.WINDOW_NAME as windowName,
+                 CF.SUPER_QUEUE_NO as superQueueNo,
+                 CB.CUSTOMER_TYPE as customerType
+            FROM TL9_SM_BRANCH_WIN_BUSI_INFO CL
+                 LEFT JOIN TL9_QU_WIN_CUS_REL CB
+                    ON CB.WINDOW_NO = CL.WINDOW_NO AND CL.WIN_BRCH_NO = CB.BRANCH_NO
+                 LEFT JOIN TL9_QU_WIN_BUSI_REL CD
+                    ON CD.WINDOW_NO = CL.WINDOW_NO AND CL.WIN_BRCH_NO = CD.BRANCH_NO
+                 LEFT JOIN TL9_QU_QUEUE_TYPE CF
+                    ON CD.QUEUE_NO = CF.QUEUE_NO
+           WHERE     CL.ONOFFSIGN = '1'
+                 AND CL.WINDOW_STATUS = '1'
+                 AND CL.WIN_BRCH_NO = #{branchId}
+        GROUP BY CL.WINDOW_NO,
+                 CL.WINDOW_NAME,
+                 CF.SUPER_QUEUE_NO,
+                 CB.CUSTOMER_TYPE
+        ORDER BY CL.WINDOW_NO ASC
+    </select>
+</mapper>

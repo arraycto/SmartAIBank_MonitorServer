@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.rule.dao.RuleParamDao">
+	<resultMap id="deviceModelCodeMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.DeviceModelCode">
+        <id property="deviceModelKey" column="DEVMODELKEY"  />
+        <result property="deviceClasskey" column="DEVCLASSKEY"  />
+        <result property="statusCode" column="STATUS_CODE"  />
+        <result property="statusDesc" column="STATUS_DESC" />
+        <result property="status" column="STATUS"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler" />
+        <result property="mStatus" column="M_STATUS"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler" />
+        <result property="alarmLevel" column="ALARM_LEVEL"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler" />
+        <result property="active" column="ACTIVE" javaType="boolean" />
+        <result property="alarmRuleId" column="ALARM_RULE_ID" />
+        <result property="repairLevel" column="REPAIR_LEVEL" />
+    </resultMap>
+
+	<resultMap id="tranCodeMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.TranCode">
+        <id property="tranCode" column="TRAN_CODE"  />
+        <result property="tranRetCode" column="TRAN_RET_CODE"  />
+        <result property="statusDesc" column="STATUS_DESC" />
+        <result property="status" column="STATUS"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler" />
+        <result property="alarmLevel" column="ALARM_LEVEL"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler" />
+        <result property="active" column="ACTIVE" javaType="boolean" />
+    </resultMap>
+
+
+    <resultMap id="paramCodeMap" type="com.dcfs.smartaibank.manager.monitor.rule.domain.ParamCode">
+        <id property="codeNo" column="CODE_NO"  />
+        <result property="typeNo" column="TYPE_NO" />
+        <result property="codeValue" column="CODE_VALUE" />
+        <result property="codeDesc" column="CODE_DESC" />
+    </resultMap>
+
+    <resultMap id="activeMap" type="java.util.HashMap">
+        <id property="KEY" column="MCLASSKEY"  />
+        <result property="VALUE" column="ACTIVE" javaType="boolean" />
+    </resultMap>
+
+	<select id="getAllDeviceModelName" resultType="java.util.HashMap">
+    	SELECT
+			MCLASSKEY||DEVMODELKEY as KEY,
+			DEVCLASSNAME as VALUE
+    	FROM
+    		MAS_TYPE_DEVICE_REF
+	</select>
+	<select id="getAllDeviceModelCode" resultMap="deviceModelCodeMap">
+    	SELECT
+			DEVMODELKEY,
+			DEVCLASSKEY,
+			STATUS_CODE,
+			STATUS_DESC,
+			STATUS,
+			M_STATUS,
+			ALARM_LEVEL,
+			ACTIVE,
+			ALARM_RULE_ID,
+			REPAIR_LEVEL
+    	FROM
+    		MAS_DEVICE_MODEL_CODE
+	</select>
+	<select id="getParamCode" resultMap="paramCodeMap">
+    	SELECT
+			TYPE_NO,
+			CODE_NO,
+			CODE_VALUE,
+			CODE_DESC
+    	FROM
+    		MAS_MONITOR_CONFIG
+    	WHERE
+    		TYPE_NO='PARAM'
+	</select>
+	<select id="getDictCode" resultMap="paramCodeMap">
+    	SELECT
+			TYPE_NO,
+			CODE_NO,
+			CODE_VALUE,
+			CODE_DESC
+    	FROM
+    		MAS_MONITOR_CONFIG
+    	WHERE
+    		TYPE_NO='DICT'
+	</select>
+	<select id="getAllMClassMonitor" resultMap="activeMap">
+    	SELECT
+			MCLASSKEY,
+			ACTIVE
+    	FROM
+    		MAS_MCLASS_MONITOR
+    </select>
+    <select id="getAllTranCode" resultMap="tranCodeMap">
+    	SELECT
+    		TRAN_CODE,
+    		TRAN_RET_CODE,
+    		STATUS,
+    		STATUS_DESC,
+    		ALARM_LEVEL,
+    		ACTIVE,
+    		COUNT
+    	FROM
+    		MAS_TRAN_CODE
+    </select>
+
+    <select id="getAllDeviceDesc" resultType="java.util.HashMap">
+    	SELECT
+    		DEVCLASSKEY||'.'||DEVMODELKEY||'.'||NAME AS KEY,
+    		DESCRIPTION AS VALUE
+    	FROM
+    		MAS_DEVICE_STATUS_DESC
+    </select>
+
+    <select id="getDeviceManager" resultType="java.util.HashMap">
+    	SELECT
+    		DEVICEID,
+    		MANAGER_ID
+    	FROM
+    		TL9_SM_DEVICE_INFO_MAINTAIN
+    </select>
+
+    <select id="getDeviceParams" resultType="java.util.HashMap">
+    	SELECT a.deviceid as deviceid,
+       CASE
+          WHEN b.network_delay IS NOT NULL
+             THEN b.network_delay
+          ELSE (SELECT code_value
+                  FROM mas_monitor_config
+                 WHERE code_no = 'NETWORK_DELAY')
+       END AS network_delay,
+       CASE
+          WHEN b.cash_upper_limit IS NOT NULL
+             THEN b.cash_upper_limit
+          ELSE (SELECT code_value
+                  FROM mas_monitor_config
+                 WHERE code_no = 'CASH_UPPER_LIMIT')
+       END AS cash_upper_limit,
+       CASE
+          WHEN b.cash_lower_limit IS NOT NULL
+             THEN b.cash_lower_limit
+          ELSE (SELECT code_value
+                  FROM mas_monitor_config
+                 WHERE code_no = 'CASH_LOWER_LIMIT')
+       END AS cash_lower_limit
+	  FROM tl9_sm_branch_device a LEFT JOIN mas_alarm_param b
+	       ON b.device_id = a.deviceid
+    </select>
+
+     <select id="getDefaultDeviceParams" resultType="java.util.HashMap">
+    	SELECT
+      (SELECT code_value
+                  FROM mas_monitor_config
+                 WHERE code_no = 'NETWORK_DELAY')
+       AS network_delay,
+       (SELECT code_value
+                  FROM mas_monitor_config
+                 WHERE code_no = 'CASH_UPPER_LIMIT')
+        AS cash_upper_limit,
+       (SELECT code_value
+                  FROM mas_monitor_config
+                 WHERE code_no = 'CASH_LOWER_LIMIT')
+       AS cash_lower_limit
+	  FROM dual
+    </select>
+
+     <select id="getVtmDeviceParams" resultType="java.util.HashMap">
+    	SELECT
+     		EVENT_CODE,
+     		SOURCE_EVENT_CODE,
+     		DEVICE_ID
+	  FROM MAS_VTM_DEVICE_CODE_INFO
+    </select>
+
+    <select id="getWorkTimeParams" resultType="java.util.HashMap" parameterType="java.util.HashMap">
+    	select distinct t.device_id as deviceid,
+		to_date(c.calendar_year||'-'||c.calendar_month||'-'||c.calendar_day ||
+		' '||t.start_time||':00','yyyy-mm-dd hh24:mi:ss') as start_time,
+		to_date(c.calendar_year||'-'||c.calendar_month||'-'||c.calendar_day ||
+		' '||t.end_time||':00','yyyy-mm-dd hh24:mi:ss') as end_time,
+		d.branch_no,
+		t.date_class as date_type
+		from tl9_sm_business_timing t
+		inner join tl9_sm_branch_device d on t.device_id = d.deviceid and d.status='1'
+		inner
+		join tl9_qu_work_calendar c on d.branch_no = c.branch_no and
+		c.calendar_type = t.date_class and
+		c.calendar_year||'-'||c.calendar_month||'-'||c.calendar_day = #{NOW_DATE}
+		order by t.device_id, start_time
+    </select>
+    <select id="queryShutDownTime" resultType="java.util.HashMap" parameterType="java.util.HashMap">
+    	select *
+		from (
+		select d.TERMINAL_ID as deviceid,
+		d.ORG_ID as branch_no,
+		to_date(d.start_date ||'
+		'||d.start_time||':00','yyyy-mm-dd
+		hh24:mi:ss') as start_time,
+		to_date(d.end_date ||'
+		'||d.end_time||':00','yyyy-mm-dd hh24:mi:ss')
+		as end_time
+		from
+		VTM_DEVICE_DOWNTIME_PLAN d
+		where status = 0
+		order by
+		d.start_date,d.start_time
+		) a
+		where
+		to_char(a.START_TIME,'yyyy-mm-dd')=#{NOW_DATE}
+		and
+		to_char(a.END_TIME,'yyyy-mm-dd')=#{NOW_DATE}
+    </select>
+</mapper>

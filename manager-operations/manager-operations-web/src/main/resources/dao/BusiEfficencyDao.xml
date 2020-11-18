@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.BusiEfficencyDao">
+	<!--日月季年补零select片段-->
+	<sql id="selectByZero">
+      SELECT time,
+       VALUE,
+       totalAvg,
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (VALUE, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.VALUE, 0) AS VALUE,
+           b.totalAvg AS totalAvg,
+           b.rate AS rate
+        FROM
+    </sql>
+	<sql id="selectForCompletionData">
+		<if test=" dateType == 'day'">
+			(SELECT TO_CHAR (TO_DATE (SUBSTR(#{timeValue}, 10), 'yyyyMMDD') -
+			(to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 ,8), 'yyyyMMDD' )+2)+ ROWNUM,
+			'yyyyMMDD')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 , 8), 'yyyyMMDD' )+2) a
+		</if>
+		<if test=" dateType == 'month'">
+			(SELECT TO_CHAR (
+			ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 13),
+			ROWNUM),
+			'yyyyMM')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 13) a
+		</if>
+		<if test=" dateType == 'quarter'">
+			(SELECT TO_CHAR (
+			ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 15),
+			3 * ROWNUM),
+			'yyyyMM')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 5) a
+		</if>
+		<if test=" dateType == 'year'">
+			(SELECT TO_CHAR (#{timeValue} - 4 + ROWNUM)
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 4) a
+		</if>
+	</sql>
+	<!--日月季年重复使用可回滚前片段-->
+	<sql id="sqlByZeroBefore">
+        left join (
+    </sql>
+	<!--日月季年重复使用可回滚后片段-->
+	<sql id="sqlByZeroAfter">
+        ) b
+    </sql>
+	<!--日月季年补零where片段-->
+	<sql id="whereByLeftJoin">
+        ON a.timelist = b.TIME
+            ORDER BY
+        a.timelist)
+    </sql>
+	<sql id="branchStatsTypeUnit2">
+		<if test="branchStatsType == 2 ">
+			and T.BRANCH_STATS_TYPE = 1
+		</if>
+		<if test="branchStatsType == 1 ">
+			and 1 != 1
+		</if>
+	</sql>
+	<sql id="branchStatsTypeUnit">
+		<if test="branchStatsType != 1 ">
+			(select distinct BUSINESS_SUPERIOR from tl9_orgbasic  where orgid = #{orgid})
+		</if>
+		<if test="branchStatsType == 1 ">
+			#{orgid}
+		</if>
+	</sql>
+	<sql id="branchStatsTypeSql">
+		<if test="branchStatsType != 0 ">
+			and T.BRANCH_STATS_TYPE=#{branchStatsType}
+		</if>
+	</sql>
+	<sql id="selectCompletionData">
+		<if test=" dateType == 'day'">
+			(SELECT TO_CHAR (TO_DATE (SUBSTR(#{timeValue}, 10), 'yyyyMMDD') -
+			(to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 ,8), 'yyyyMMDD' )+2)+ ROWNUM + 1,
+			'yyyyMMDD')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 , 8) + 1, 'yyyyMMDD' )+2) a
+		</if>
+		<if test=" dateType == 'month'">
+			(SELECT TO_CHAR (
+			ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 12),
+			ROWNUM),
+			'yyyyMM')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 12) a
+		</if>
+		<if test=" dateType == 'quarter'">
+			(SELECT TO_CHAR (
+			ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 12),
+			3 * (ROWNUM)),
+			'yyyyMM')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 4) a
+		</if>
+		<if test=" dateType == 'year'">
+			(SELECT TO_CHAR (#{timeValue} - 3 + ROWNUM)
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 3) a
+		</if>
+	</sql>
+	<select id="getAvgBusinessUnitNo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.BusiEffectDomain">
+		SELECT distinct
+		floor(NVL(T.TRAN_COUNT_T_AVG,0)) as tranCounTotalAvg,
+		NVL(round(T.HANDLE_TIME_T_AVG,2),0) as handleTimeTotalAvg
+		<if test="dateType == 'day' ">
+			FROM SB_STATS_GATHER_D T
+			WHERE
+			T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+		</if>
+		<if test="dateType == 'month' ">
+			FROM SB_STATS_GATHER_M T            WHERE T.TRADE_YM = #{timeValue}
+		</if>
+		<if test="dateType == 'quarter' ">
+			FROM SB_STATS_GATHER_Q T            WHERE T.TRADE_QUARTER = #{timeValue}
+		</if>
+		<if test="dateType == 'year' ">
+			FROM SB_STATS_GATHER_Y T            WHERE T.TRADE_YEAR = #{timeValue}
+		</if>
+		AND T.UNIT_NO = <include refid="branchStatsTypeUnit"/>
+		<!--(select distinct BUSINESS_SUPERIOR from tl9_orgbasic  where orgid = #{orgid})-->
+	</select>
+	<select id="getAvgBusinessSum" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.BusiEffectDomain">
+		SELECT T.TRAN_COUNT as tranCount,
+		T.TRAN_COUNT_RING as tranCountRing,
+		round(T.HANDLE_TIME_AVG,2) as handleTimeAvg,
+		T.HANDLE_TIME_RING as handleTimeRing,
+		FLOOR(T.TRAN_COUNT_T_AVG) as tranCounTotalAvg,
+		round(T.HANDLE_TIME_T_AVG,2) as handleTimeTotalAvg
+		<if test="dateType == 'day' ">
+			FROM SB_STATS_GATHER_D T
+			WHERE
+			T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+		</if>
+		<if test="dateType == 'month' ">
+			FROM SB_STATS_GATHER_M T            WHERE T.TRADE_YM = #{timeValue}            AND T.BRANCH_NO = #{orgid}
+		</if>
+		<if test="dateType == 'quarter' ">
+			FROM SB_STATS_GATHER_Q T            WHERE T.TRADE_QUARTER = #{timeValue}        AND T.BRANCH_NO = #{orgid}
+		</if>
+		<if test="dateType == 'year' ">
+			FROM SB_STATS_GATHER_Y T            WHERE T.TRADE_YEAR = #{timeValue}            AND T.BRANCH_NO = #{orgid}
+		</if>
+		<include refid="branchStatsTypeSql"/>
+	</select>
+	<select id="getTimeGroupBusiSumList"  parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+		<include refid="selectByZero"/>
+		<include refid="selectForCompletionData"/>
+		<include refid="sqlByZeroBefore"/>
+		<if test="dateType == 'day' ">
+			SELECT  T.TRAN_COUNT as value,
+			FLOOR(T.TRAN_COUNT_T_AVG) as totalAvg,
+			T.TRADE_DATE as time,
+			T.TRAN_COUNT_RING as rate
+			FROM SB_STATS_GATHER_D T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_DATE(T.TRADE_DATE, 'YYYYMMDD') BETWEEN
+			ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)
+			AND TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+		</if>
+		<if test="dateType == 'month' ">
+			SELECT  T.TRAN_COUNT as value,
+			FLOOR(T.TRAN_COUNT_T_AVG) as totalAvg,
+			T.TRADE_YM as time,
+			T.TRAN_COUNT_RING as rate
+			FROM SB_STATS_GATHER_M T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM')
+		</if>
+		<if test="dateType == 'quarter' ">
+			SELECT  T.TRAN_COUNT as value,
+			FLOOR(T.TRAN_COUNT_T_AVG) as totalAvg,
+			T.TRADE_QUARTER as time,
+			T.TRAN_COUNT_RING as rate
+			FROM SB_STATS_GATHER_Q T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_DATE(t.TRADE_QUARTER,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM')
+		</if>
+		<if test="dateType == 'year' ">
+			SELECT  T.TRAN_COUNT as value,
+			FLOOR(T.TRAN_COUNT_T_AVG) as totalAvg,
+			T.TRADE_YEAR as time,
+			T.TRAN_COUNT_RING as rate
+			FROM SB_STATS_GATHER_Y T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_NUMBER(T.TRADE_YEAR)  BETWEEN  TO_NUMBER(#{timeValue})- 4 AND  TO_NUMBER(#{timeValue})
+		</if>
+		<include refid="branchStatsTypeSql"/>
+		<include refid="sqlByZeroAfter"/>
+		<include refid="whereByLeftJoin"/>
+	</select>
+	<select id="getTimeGroupDealTime" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+		<include refid="selectByZero"/>
+		<include refid="selectForCompletionData"/>
+		<include refid="sqlByZeroBefore"/>
+		<if test="dateType == 'day' ">
+			SELECT  round(T.HANDLE_TIME_AVG,2) as value,
+			round(T.Handle_Time_t_Avg,2) as totalAvg,
+			T.TRADE_DATE    as time,
+			round(T.HANDLE_TIME_RING,4) as rate
+			FROM SB_STATS_GATHER_D T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_DATE(T.TRADE_DATE, 'YYYYMMDD') BETWEEN
+			ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+		</if>
+		<if test="dateType == 'month' ">
+			SELECT round(T.HANDLE_TIME_AVG,2) as value,
+			round(T.Handle_Time_t_Avg,2) as totalAvg,
+			T.TRADE_YM    as time,
+			round(T.HANDLE_TIME_RING,4) as rate
+			FROM SB_STATS_GATHER_M T            WHERE T.BRANCH_NO = #{orgid}
+			AND  TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM')
+		</if>
+		<if test="dateType == 'quarter' ">
+			SELECT round(T.HANDLE_TIME_AVG,2) as value,
+			round(T.Handle_Time_t_Avg,2) as totalAvg,
+			T.TRADE_QUARTER    as time,
+			round(T.HANDLE_TIME_RING,4) as rate
+			FROM SB_STATS_GATHER_Q T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_DATE(t.TRADE_QUARTER,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM')
+		</if>
+		<if test="dateType == 'year' ">
+			SELECT round(T.HANDLE_TIME_AVG,2) as value,
+			round(T.Handle_Time_t_Avg,2) as totalAvg,
+			T.TRADE_YEAR    as time,
+			round(T.HANDLE_TIME_RING,4) as rate
+			FROM SB_STATS_GATHER_Y T            WHERE T.BRANCH_NO = #{orgid}
+			AND TO_NUMBER(T.TRADE_YEAR)  BETWEEN  TO_NUMBER(#{timeValue})- 4 AND  TO_NUMBER(#{timeValue})
+		</if>
+		<include refid="branchStatsTypeSql"/>
+		<include refid="sqlByZeroAfter"/>
+		<include refid="whereByLeftJoin"/>
+	</select>
+	<select id="getBusiSumRankTop10List" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+		<if test="dateType == 'day' ">
+			select t2.*,ROWNUM AS rankNo from ( SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			T.TRAN_COUNT as value,
+			floor(T.TRAN_COUNT_T_AVG) as totalAvg,
+			t.tran_count_ring  AS   rate
+			FROM SB_STATS_GATHER_D T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			<include refid="branchStatsTypeUnit2"></include>
+			ORDER BY T.TRAN_COUNT DESC) t2 where rownum &lt;#{rownum}
+		</if>
+		<if test="dateType == 'month' ">
+			select t2.*, ROWNUM AS rankNo from (SELECT  T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			T.TRAN_COUNT as value,
+			floor(T.TRAN_COUNT_T_AVG) as totalAvg,
+			t.tran_count_ring  AS   rate
+			FROM SB_STATS_GATHER_M T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_YM = #{timeValue}
+			<include refid="branchStatsTypeUnit2"></include>
+			ORDER BY T.TRAN_COUNT DESC) t2 where rownum &lt;#{rownum}
+		</if>
+		<if test="dateType == 'quarter' ">
+			select t2.*,ROWNUM AS rankNo  from (   SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			T.TRAN_COUNT as value,
+			floor(T.TRAN_COUNT_T_AVG) as totalAvg,
+			t.tran_count_ring  AS   rate
+			FROM SB_STATS_GATHER_Q T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_QUARTER = #{timeValue}
+			<include refid="branchStatsTypeUnit2"></include>
+			ORDER BY T.TRAN_COUNT DESC) t2  where rownum &lt;#{rownum}
+		</if>
+		<if test="dateType == 'year' ">
+			select t2.*,ROWNUM AS rankNo  from (  SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			T.TRAN_COUNT as value,
+			floor(T.TRAN_COUNT_T_AVG) as totalAvg,
+			t.tran_count_ring  AS   rate
+			FROM SB_STATS_GATHER_Y T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_YEAR = #{timeValue}
+			<include refid="branchStatsTypeUnit2"></include>
+			ORDER BY T.TRAN_COUNT DESC) t2 where rownum &lt;#{rownum}
+		</if>
+	</select>
+	<select id="getDealTimeRannkTop10List" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+		<if test="dateType == 'day' ">
+			select t2.*,ROWNUM AS rankNo from (SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			round(T.HANDLE_TIME_AVG,2) as value,
+			round(t.handle_time_ring,4) AS rate,
+			round(T.HANDLE_TIME_T_AVG,2) as totalAvg
+			FROM SB_STATS_GATHER_D T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			<include refid="branchStatsTypeUnit2"/>
+			<if test="sortType=='DESC'">
+				ORDER BY T.HANDLE_TIME_AVG DESC
+			</if>
+			<if test="sortType=='ASC'">
+				ORDER BY T.HANDLE_TIME_AVG ASC
+			</if>) t2  WHERE ROWNUM &lt; #{rownum}
+		</if>
+		<if test="dateType == 'month' ">
+			select t2.*,ROWNUM AS rankNo  from ( SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			round(T.HANDLE_TIME_AVG,2) as value,
+			round(t.handle_time_ring,4) AS rate,
+			T.HANDLE_TIME_T_AVG as totalAvg
+			FROM SB_STATS_GATHER_M T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_YM = #{timeValue}<include refid="branchStatsTypeUnit2"/>
+			<if test="sortType=='DESC'">
+				ORDER BY T.HANDLE_TIME_AVG DESC
+			</if>
+			<if test="sortType=='ASC'">
+				ORDER BY T.HANDLE_TIME_AVG ASC
+			</if>) t2 WHERE ROWNUM &lt; #{rownum}
+		</if>
+		<if test="dateType == 'quarter' ">
+			select t2.*,ROWNUM AS rankNo  from ( SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			round(T.HANDLE_TIME_AVG,2) as value,
+			round(t.handle_time_ring,4) AS rate,
+			T.HANDLE_TIME_T_AVG as totalAvg
+			FROM SB_STATS_GATHER_Q T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_QUARTER = #{timeValue}<include refid="branchStatsTypeUnit2"/>
+			<if test="sortType=='DESC'">
+				ORDER BY T.HANDLE_TIME_AVG DESC
+			</if>
+			<if test="sortType=='ASC'">
+				ORDER BY T.HANDLE_TIME_AVG ASC
+			</if>) t2 WHERE ROWNUM &lt; #{rownum}
+		</if>
+		<if test="dateType == 'year' ">
+			select t2.*,ROWNUM AS rankNo  from ( SELECT T.BRANCH_NO as branchNo,
+			T.BRANCH_NAME as branchName,
+			round(T.HANDLE_TIME_AVG,2) as value,
+			round(t.handle_time_ring,4) AS rate,
+			T.HANDLE_TIME_T_AVG as totalAvg
+			FROM SB_STATS_GATHER_Y T
+			WHERE T.UNIT_NO = #{orgid}
+			AND T.TRADE_YEAR = #{timeValue}<include refid="branchStatsTypeUnit2"/>
+			<if test="sortType=='DESC'">
+				ORDER BY T.HANDLE_TIME_AVG DESC
+			</if>
+			<if test="sortType=='ASC'">
+				ORDER BY T.HANDLE_TIME_AVG ASC
+			</if>) t2 WHERE ROWNUM &lt; #{rownum}
+		</if>
+	</select>
+	<select id="getHighFrequencyTradeTop20List" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.HighFrequencyTradeDomain">
+		<if test=" dateType == 'day'">
+			SELECT * FROM (
+			SELECT  T.TRAN_CODE as tradeCode ,
+			T.TRAN_NAME as tradeName,
+			T.TRAN_COUNT as trandCount,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2)as tranCountTotalAvg ,
+			round(T.HANDLE_TIME_AVG,2) as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG,2) as handleTimeTotalAvg,
+			round(T.HANDLE_TIME_RING,4) as handleTimeRing
+			FROM SB_STATS_EFFIC_TRANS_D T
+			WHERE  T.TRAN_FLAG = #{tranFlag}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			<include refid="branchStatsTypeSql"/>
+			<if test="sortType=='DESC' ">
+				ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+			</if>
+			<if test="sortType=='ASC' ">
+				ORDER BY T.HANDLE_TIME_AVG desc, T.TRAN_CODE asc)
+			</if>
+			WHERE ROWNUM  &lt; 21
+		</if>
+		<if test=" dateType == 'month'">
+			SELECT * FROM (
+			SELECT  T.TRAN_CODE as tradeCode ,
+			T.TRAN_NAME as tradeName,
+			T.TRAN_COUNT as trandCount,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2)as tranCountTotalAvg ,
+			round(T.HANDLE_TIME_AVG,2) as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG,2) as handleTimeTotalAvg,
+			round(T.HANDLE_TIME_RING,4) as handleTimeRing
+			FROM SB_STATS_EFFIC_TRANS_M T
+			WHERE  T.TRAN_FLAG = #{tranFlag}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRADE_YM = #{timeValue}<include refid="branchStatsTypeSql"/>
+			<if test="sortType=='DESC' ">
+				ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+			</if>
+			<if test="sortType=='ASC' ">
+				ORDER BY T.HANDLE_TIME_AVG desc, T.TRAN_CODE asc)
+			</if>
+			WHERE ROWNUM  &lt; 21
+		</if>
+		<if test=" dateType == 'quarter'">
+			SELECT * FROM (
+			SELECT  T.TRAN_CODE as tradeCode ,
+			T.TRAN_NAME as tradeName,
+			T.TRAN_COUNT as trandCount,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2)as tranCountTotalAvg ,
+			round(T.HANDLE_TIME_AVG,2) as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG,2) as handleTimeTotalAvg,
+			round(T.HANDLE_TIME_RING,4) as handleTimeRing
+			FROM SB_STATS_EFFIC_TRANS_Q T
+			WHERE  T.TRAN_FLAG = #{tranFlag}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.Trade_Quarter = #{timeValue}<include refid="branchStatsTypeSql"/>
+			<if test="sortType=='DESC' ">
+				ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+			</if>
+			<if test="sortType=='ASC' ">
+				ORDER BY T.HANDLE_TIME_AVG desc, T.TRAN_CODE asc)
+			</if>
+			WHERE ROWNUM  &lt; 21
+		</if>
+		<if test=" dateType == 'year'">
+			SELECT * FROM (
+			SELECT  T.TRAN_CODE as tradeCode ,
+			T.TRAN_NAME as tradeName,
+			T.TRAN_COUNT as trandCount,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2)as tranCountTotalAvg ,
+			round(T.HANDLE_TIME_AVG,2) as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG,2) as handleTimeTotalAvg,
+			round(T.HANDLE_TIME_RING,4) as handleTimeRing
+			FROM SB_STATS_EFFIC_TRANS_Y T
+			WHERE  T.TRAN_FLAG = #{tranFlag}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRADE_YEAR = #{timeValue}<include refid="branchStatsTypeSql"/>
+			<if test="sortType=='DESC' ">
+				ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+			</if>
+			<if test="sortType=='ASC' ">
+				ORDER BY T.HANDLE_TIME_AVG desc, T.TRAN_CODE asc)
+			</if>
+			WHERE ROWNUM  &lt; 21
+		</if>
+	</select>
+	<select id="getTendList" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.HighFrequencyTradeDomain">
+		SELECT
+		a.timelist as TIME,
+		b.trandCount,
+		b.tranCountRing,
+		b.tranCountTotalAvg,
+		b.handleTimeRing,
+		b.handleTimeAvg,
+		b.handleTimeTotalAvg
+		FROM
+		<include refid="selectCompletionData"/>
+		<include refid="sqlByZeroBefore"/>
+		<if test=" dateType == 'day'">
+			SELECT
+			t.TRAN_COUNT       as trandCount ,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2) as tranCountTotalAvg,
+			round(T.HANDLE_TIME_RING ,4) as handleTimeRing,
+			round(T.HANDLE_TIME_AVG,2)   as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG ,2) as handleTimeTotalAvg,
+			T.TRADE_DATE AS TIME
+			FROM SB_STATS_EFFIC_TRANS_D T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRAN_FLAG = #{tranFlag}
+			AND to_date(T.TRADE_DATE,'YYYYMMDD' )BETWEEN
+			TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD')  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+			<include refid="branchStatsTypeSql"/>
+			order by T.TRADE_DATE asc
+		</if>
+		<if test=" dateType == 'month'">
+			SELECT
+			t.TRAN_COUNT       as trandCount ,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2) as tranCountTotalAvg,
+			round(T.HANDLE_TIME_RING ,4) as handleTimeRing,
+			round(T.HANDLE_TIME_AVG,2)   as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG ,2) as handleTimeTotalAvg,
+			T.TRADE_ym AS TIME
+			FROM SB_STATS_EFFIC_TRANS_M T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRAN_FLAG = #{tranFlag}
+			AND  TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12)
+			AND TO_DATE(#{timeValue},'YYYYMM')
+			<include refid="branchStatsTypeSql"/>
+			order by T.TRADE_ym asc
+		</if>
+		<if test=" dateType == 'quarter'">
+			SELECT
+			t.TRAN_COUNT       as trandCount ,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2) as tranCountTotalAvg,
+			round(T.HANDLE_TIME_RING ,4) as handleTimeRing,
+			round(T.HANDLE_TIME_AVG,2)   as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG ,2) as handleTimeTotalAvg,
+			T.TRADE_quarter AS TIME
+			FROM SB_STATS_EFFIC_TRANS_Q T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRAN_FLAG = #{tranFlag}
+			AND TO_DATE(t.TRADE_QUARTER,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12)
+			AND TO_DATE(#{timeValue},'YYYYMM')
+			<include refid="branchStatsTypeSql"/>
+			order by T.TRADE_quarter asc
+		</if>
+		<if test=" dateType == 'year'">
+			SELECT
+			t.TRAN_COUNT       as trandCount ,
+			round(T.TRAN_COUNT_RING ,4)as tranCountRing,
+			round(T.TRAN_COUNT_T_AVG ,2) as tranCountTotalAvg,
+			round(T.HANDLE_TIME_RING ,4) as handleTimeRing,
+			round(T.HANDLE_TIME_AVG,2)   as handleTimeAvg,
+			round(T.HANDLE_TIME_T_AVG ,2) as handleTimeTotalAvg,
+			T.TRADE_year AS TIME
+			FROM SB_STATS_EFFIC_TRANS_Y T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND T.BRANCH_NO = #{orgid}
+			AND T.TRAN_FLAG = #{tranFlag}
+			AND TO_NUMBER(T.TRADE_YEAR)  BETWEEN  TO_NUMBER(#{timeValue})- 3
+			AND  TO_NUMBER(#{timeValue})
+			<include refid="branchStatsTypeSql"/>
+			order by T.TRADE_year asc
+		</if>
+		<include refid="sqlByZeroAfter"/>
+		ON a.timelist = b.TIME
+		ORDER BY
+		a.timelist
+	</select>
+	<select id="getMostQuickTime" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+		SELECT
+		a.timelist as TIME,
+		b.MINITIME
+		FROM
+		<include refid="selectCompletionData"/>
+		<include refid="sqlByZeroBefore"/>
+		<if test="dateType=='day'">
+			SELECT T.TRADE_DATE as TIME, round(MIN(T.HANDLE_TIME_AVG) ,2) AS MINITIME
+			FROM SB_STATS_EFFIC_TRANS_D T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND to_date(T.TRADE_DATE,'yyyymmdd') BETWEEN
+			TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD') AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+			AND T.TRAN_FLAG = #{tranFlag}
+			GROUP BY t.TRADE_DATE
+			ORDER BY t.trade_date ASC
+		</if>
+		<if test="dateType=='month'">
+			SELECT T.TRADE_ym as TIME, round(MIN(T.HANDLE_TIME_AVG) ,2) AS MINITIME
+			FROM SB_STATS_EFFIC_TRANS_m T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND TO_DATE(t.TRADE_YM,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM')
+			AND T.TRAN_FLAG = #{tranFlag}
+			GROUP BY t.TRADE_ym
+			ORDER BY t.TRADE_ym ASC
+		</if>
+		<if test="dateType=='quarter'">
+			SELECT T.TRADE_quarter as TIME, round(MIN(T.HANDLE_TIME_AVG) ,2) AS MINITIME
+			FROM SB_STATS_EFFIC_TRANS_q T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND TO_DATE(t.TRADE_quarter,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM')
+			AND T.TRAN_FLAG = #{tranFlag}
+			GROUP BY t.TRADE_quarter
+			ORDER BY t.TRADE_quarter ASC
+		</if>
+		<if test="dateType=='year'">
+			SELECT T.TRADE_year as time, round(MIN(T.HANDLE_TIME_AVG) ,2) AS MINITIME
+			FROM SB_STATS_EFFIC_TRANS_y T
+			WHERE T.TRAN_CODE = #{tradeType}
+			AND  t.TRADE_year BETWEEN  TO_number(#{timeValue})-3  AND TO_number(#{timeValue})
+			AND T.TRAN_FLAG = #{tranFlag}
+			GROUP BY t.TRADE_year
+			ORDER BY t.TRADE_year ASC
+		</if>
+		<include refid="sqlByZeroAfter"/>
+		ON a.timelist = b.TIME
+		ORDER BY
+		a.timelist
+	</select>
+	<select id="getTradeSumInfo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.HighFrequencyTradeDomain">
+		SELECT  sum(t.TRAN_COUNT) AS trandCount,
+		round(sum(T.Handle_Time_Total)/ sum(t.TRAN_COUNT),2)  AS handleTimeTotal
+		<if test=" dateType == 'day'">
+			FROM SB_STATS_EFFIC_TRANS_D T            WHERE T.BRANCH_NO =#{orgid}
+			AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.tran_flag=#{tranFlag}
+		</if>
+		<if test=" dateType == 'month'">
+			FROM SB_STATS_EFFIC_TRANS_M T            WHERE T.BRANCH_NO  =#{orgid}            AND t.trade_ym = #{timeValue}            AND t.tran_flag=#{tranFlag}
+		</if>
+		<if test=" dateType == 'quarter'">
+			FROM SB_STATS_EFFIC_TRANS_q T            WHERE T.BRANCH_NO  =#{orgid}            AND t.trade_quarter= #{timeValue}        AND t.tran_flag=#{tranFlag}
+		</if>
+		<if test=" dateType == 'year'">
+			FROM SB_STATS_EFFIC_TRANS_Y T            WHERE T.BRANCH_NO =#{orgid}             AND t.trade_YEAR = #{timeValue}            AND t.tran_flag=#{tranFlag}
+		</if>
+		<include refid="branchStatsTypeSql"/>
+	</select>
+</mapper>

@@ -1,0 +1,916 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.HallMarketDao">
+    <!--日月季年补零select片段-->
+    <sql id="selectByZero">
+      SELECT time,
+       VALUE,
+       FLOOR(NVL(totalAvg,0)) AS totalAvg,
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (VALUE, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.VALUE, 0) AS VALUE,
+           b.totalAvg AS totalAvg,
+           b.rate AS rate
+        FROM
+    </sql>
+    <!--大堂经理日月季年补零select片段-->
+    <sql id="selectUserByZero">
+      SELECT time,
+       count,
+       FLOOR(NVL(avgValue,0)) AS avgValue,
+       FLOOR(NVL(branchAvg,0)) AS branchAvg,
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (count, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.count, 0) AS count,
+           b.avgValue AS avgValue,
+           NVL (b.branchAvg, 0) AS branchAvg,
+           b.rate AS rate
+        FROM
+    </sql>
+    <sql id="selectForCompletionData">
+        <if test=" dateType == 'day'">
+            (SELECT TO_CHAR (TO_DATE (SUBSTR(#{timeValue}, 10), 'yyyyMMDD') -
+            (to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 ,8), 'yyyyMMDD' )+2)+
+            ROWNUM,
+            'yyyyMMDD')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 ,
+            8), 'yyyyMMDD' )+2) a
+        </if>
+        <if test=" dateType == 'month'">
+            (SELECT TO_CHAR (
+            ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 13),
+            ROWNUM),
+            'yyyyMM')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 13) a
+        </if>
+        <if test=" dateType == 'quarter'">
+            (SELECT TO_CHAR (
+            ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 15),
+            3 * ROWNUM),
+            'yyyyMM')
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 5) a
+        </if>
+        <if test=" dateType == 'year'">
+            (SELECT TO_CHAR (#{timeValue} - 4 + ROWNUM)
+            AS timelist
+            FROM DUAL
+            CONNECT BY ROWNUM &lt;= 4) a
+        </if>
+    </sql>
+    <!--日月季年重复使用可回滚前片段-->
+    <sql id="sqlByZeroBefore">
+        left join (
+    </sql>
+    <!--日月季年重复使用可回滚后片段-->
+    <sql id="sqlByZeroAfter">
+        ) b
+    </sql>
+    <!--日月季年补零where片段-->
+    <sql id="whereByLeftJoin">
+        ON a.timelist = b.TIME
+            ORDER BY
+        a.timelist)
+    </sql>
+    <sql id="branchStatsTypeSql">
+        <if test="branchStatsType != 0 ">
+            and T.BRANCH_STATS_TYPE=#{branchStatsType}
+        </if>
+    </sql>
+    <sql id="branchStatsTypeUnit2">
+        <if test="branchStatsType == 2 ">
+            and T.BRANCH_STATS_TYPE = 1
+        </if>
+        <if test="branchStatsType == 1 ">
+            and 1 != 1
+        </if>
+    </sql>
+
+    <select id="getHallMarketSum" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        select
+        <if test="saleType == 'identify'">
+            t.mkt_c_count as count,
+            t.mkt_c_count_t_avg as avgValue ,
+            t.mkt_c_count_b_avg as branchAvg,
+            t.MKT_C_COUNT_RING as rate
+        </if>
+        <if test="saleType == 'protential'">
+            t.potential_reg_count as count,
+            t.potential_reg_count_t_avg as avgValue,
+            t.potential_reg_count_b_avg as branchAvg,
+            t.POTENTIAL_REG_COUNT_RING as rate
+        </if>
+        <if test="saleType == 'product'">
+            t.mkt_p_count as count,
+            t.mkt_p_count_t_avg as avgValue ,
+            t.mkt_p_count_b_avg as branchAvg,
+            t.MKT_P_COUNT_RING as rate
+        </if>
+        <if test="saleType == 'reserve'">
+            t.reserve_reg_count as count,
+            t.reserve_reg_count_t_avg as avgValue ,
+            t.reserve_reg_count_b_avg as branchAvg,
+            t.RESERVE_REG_COUNT_RING as rate
+        </if>
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_MKT_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_MKT_M T WHERE T.TRADE_YM = #{timeValue}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_MKT_q T WHERE T.TRADE_quarter = #{timeValue}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_MKT_y T WHERE T.TRADE_YEAR = #{timeValue}
+        </if>
+        AND T.BRANCH_NO = (select distinct BUSINESS_SUPERIOR from tl9_orgbasic where orgid = #{orgid})
+    </select>
+    <select id="getSaleCustHallMarketSum" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        SELECT
+        T.MKT_C_COUNT as count,
+        T.MKT_C_COUNT_T_AVG as avgValue,
+        T.MKT_C_COUNT_RING as rate
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_MKT_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10)) AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_MKT_M T WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_MKT_q T WHERE T.TRADE_quarter = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_MKT_y T WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+    </select>
+    <select id="getTimeGroupSaleCustList" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        <if test="dateType == 'day' ">
+            SELECT
+            T.MKT_C_COUNT as value,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            T.TRADE_DATE as time,
+            T.MKT_C_COUNT_RING as rate
+            FROM SB_STATS_MKT_D T WHERE TO_DATE(T.TRADE_DATE,'YYYYMMDD' ) BETWEEN ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT
+            T.MKT_C_COUNT as value,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            T.TRADE_ym as time,
+            T.MKT_C_COUNT_RING as rate
+            FROM SB_STATS_MKT_M T
+            WHERE TO_DATE(T.TRADE_YM,'YYYYMM' ) BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND
+            TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT
+            T.MKT_C_COUNT as value,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            T.TRADE_quarter as time,
+            T.MKT_C_COUNT_RING as rate
+            FROM SB_STATS_MKT_Q T WHERE TO_DATE(T.TRADE_quarter,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-3*4) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT
+            T.MKT_C_COUNT as value,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            T.TRADE_year as time,
+            T.MKT_C_COUNT_RING as rate
+            FROM SB_STATS_MKT_Y T WHERE TO_NUMBER(T.TRADE_YEAR) BETWEEN TO_NUMBER(#{timeValue})- 4 AND
+            TO_NUMBER(#{timeValue})
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+
+    <select id="getPotentialCustRegisterSum" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        SELECT
+        T.POTENTIAL_REG_COUNT as count,
+        T.POTENTIAL_REG_COUNT_T_AVG as avgvalue,
+        T.POTENTIAL_REG_COUNT_RING as rate
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_MKT_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_MKT_M T WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_MKT_q T WHERE T.TRADE_quarter = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_MKT_y T WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+    </select>
+    <select id="getTimeGroupPotentialCustList" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        <if test="dateType == 'day' ">
+            SELECT
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_DATE as time,
+            T.POTENTIAL_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_D T WHERE TO_DATE(T.TRADE_DATE,'YYYYMMDD' ) BETWEEN ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_ym as time,
+            T.POTENTIAL_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_M T WHERE TO_DATE(T.TRADE_YM,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_quarter as time,
+            T.POTENTIAL_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_Q T WHERE TO_DATE(T.TRADE_quarter,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-3*4) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_year as time,
+            T.POTENTIAL_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_Y T WHERE
+            TO_NUMBER(T.TRADE_YEAR) BETWEEN TO_NUMBER(#{timeValue})- 4 AND TO_NUMBER(#{timeValue})
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+    <select id="getSaleProductCountSum" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        SELECT
+        T.MKT_P_COUNT as count,
+        T.MKT_P_COUNT_T_AVG as avgvalue,
+        T.MKT_P_COUNT_RING as rate
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_MKT_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_MKT_M T WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_MKT_q T WHERE T.TRADE_quarter = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_MKT_y T WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+    </select>
+    <select id="getTimeGroupSaleProductCountList" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        <if test="dateType == 'day' ">
+            SELECT
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            T.TRADE_DATE as time,
+            T.MKT_P_COUNT_RING as rate
+            FROM SB_STATS_MKT_D T WHERE TO_DATE(T.TRADE_DATE,'YYYYMMDD' ) BETWEEN
+			ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            T.TRADE_ym as time,
+            T.MKT_P_COUNT_RING as rate
+            FROM SB_STATS_MKT_M T WHERE TO_DATE(T.TRADE_YM,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            T.TRADE_quarter as time,
+            T.MKT_P_COUNT_RING as rate
+            FROM SB_STATS_MKT_Q T WHERE TO_DATE(T.TRADE_quarter,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-3*4) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            T.TRADE_year as time,
+            T.MKT_P_COUNT_RING as rate
+            FROM SB_STATS_MKT_Y t WHERE TO_NUMBER(T.TRADE_YEAR) BETWEEN TO_NUMBER(#{timeValue})- 4 AND
+            TO_NUMBER(#{timeValue})
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+    <select id="getReserveBuyCustSum" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        SELECT T.BRANCH_NO as branchNo,
+        T.BRANCH_NAME as branchName,
+        T.RESERVE_REG_COUNT as count,
+        T.RESERVE_REG_COUNT_T_AVG as avgvalue,
+        T.RESERVE_REG_COUNT_RING as rate
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_MKT_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_MKT_M T WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_MKT_q T WHERE T.TRADE_quarter = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_MKT_y T WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+    </select>
+    <select id="getTimeGroupReserveCustCountList" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+        <include refid="selectByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        <if test="dateType == 'day' ">
+            SELECT
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_DATE as time,
+            T.RESERVE_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_D T WHERE TO_DATE(T.TRADE_DATE,'YYYYMMDD' ) BETWEEN
+			ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_YM as time,
+            T.RESERVE_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_M T WHERE TO_DATE(T.TRADE_YM,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*12) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_QUARTER as time,
+            T.RESERVE_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_Q T WHERE TO_DATE(T.TRADE_quarter,'YYYYMM' ) BETWEEN
+            ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-3*4) AND TO_DATE(#{timeValue},'YYYYMM' )
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            T.TRADE_YEAR as time,
+            T.RESERVE_REG_COUNT_RING as rate
+            FROM SB_STATS_MKT_Y T WHERE TO_NUMBER(T.TRADE_YEAR) BETWEEN TO_NUMBER(#{timeValue})- 4 AND
+            TO_NUMBER(#{timeValue})
+            AND T.BRANCH_NO =#{orgid}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+    <select id="getSubBranSaleCustRankTop10List" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_C_COUNT as value ,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            t.mkt_c_count_ring as rate
+            FROM SB_STATS_MKT_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <include refid="branchStatsTypeUnit2"/>
+            <if test=" sortType=='DESC'">
+                ORDER BY T.MKT_C_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.MKT_C_COUNT ASC
+            </if>
+            ) t2 where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_C_COUNT as value ,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            t.mkt_c_count_ring as rate
+            FROM SB_STATS_MKT_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            <if test=" sortType=='DESC'">
+                ORDER BY T.MKT_C_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.MKT_C_COUNT ASC
+            </if>
+            ) t2 where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_C_COUNT as value ,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            t.mkt_c_count_ring as rate
+            FROM SB_STATS_MKT_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            <if test=" sortType=='DESC'">
+                ORDER BY T.MKT_C_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.MKT_C_COUNT ASC
+            </if>
+            ) t2 where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_C_COUNT as value ,
+            T.MKT_C_COUNT_T_AVG as totalAvg,
+            t.mkt_c_count_ring as rate
+            FROM SB_STATS_MKT_y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_Year = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            <if test=" sortType=='DESC'">
+                ORDER BY T.MKT_C_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.MKT_C_COUNT ASC
+            </if>
+            ) t2 where ROWNUM &lt; #{rownum}
+        </if>
+    </select>
+    <select id="getSubBranPotentialCustRankTop10List" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            t.potential_reg_count_ring AS rate
+            FROM SB_STATS_MKT_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.POTENTIAL_REG_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            t.potential_reg_count_ring AS rate
+            FROM SB_STATS_MKT_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.POTENTIAL_REG_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            t.potential_reg_count_ring AS rate
+            FROM SB_STATS_MKT_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.POTENTIAL_REG_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.POTENTIAL_REG_COUNT as value,
+            T.POTENTIAL_REG_COUNT_T_AVG as totalAvg,
+            t.potential_reg_count_ring AS rate
+            FROM SB_STATS_MKT_y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_Year = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.POTENTIAL_REG_COUNT DESC)t2 WHERE ROWNUM &lt; 11
+        </if>
+    </select>
+    <select id="getSubBranSaleProductRankTop10List" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            t.mkt_p_count_ring AS rate
+            FROM SB_STATS_MKT_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.MKT_P_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            t.mkt_p_count_ring AS rate
+            FROM SB_STATS_MKT_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.MKT_P_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            t.mkt_p_count_ring AS rate
+            FROM SB_STATS_MKT_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.MKT_P_COUNT DESC
+            ) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.MKT_P_COUNT as value,
+            T.MKT_P_COUNT_T_AVG as totalAvg,
+            t.mkt_p_count_ring AS rate
+            FROM SB_STATS_MKT_y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_Year = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.MKT_P_COUNT DESC) t2
+            WHERE ROWNUM &lt; 11
+        </if>
+    </select>
+    <select id="getSubBranReserveBuyRankTop10List" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            t.reserve_reg_count_ring AS rate
+            FROM SB_STATS_MKT_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.RESERVE_REG_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            t.reserve_reg_count_ring AS rate
+            FROM SB_STATS_MKT_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.RESERVE_REG_COUNT DESC) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT t2.*,rownum as rankNo FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            t.reserve_reg_count_ring AS rate
+            FROM SB_STATS_MKT_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.RESERVE_REG_COUNT DESC
+            ) t2 WHERE ROWNUM &lt; 11
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT t2.*,rownum as rankNo
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RESERVE_REG_COUNT as value,
+            T.RESERVE_REG_COUNT_T_AVG as totalAvg,
+            t.reserve_reg_count_ring AS rate
+            FROM SB_STATS_MKT_y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_Year = #{timeValue}
+            <include refid="branchStatsTypeUnit2"/>
+            ORDER BY T.RESERVE_REG_COUNT DESC) t2
+            WHERE ROWNUM &lt; 11
+        </if>
+    </select>
+    <select id="getCustReceptionPartList" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.BusinessDomain">
+        SELECT T.PUSH_COUNT as pushCount,
+        T.RECEIVE_COUNT AS receiveCount,
+        t.receive_rate AS recevieRate,
+        t.negative_count AS negativeCount,
+        t.negative_handle_count AS negativeHandleCount,
+        t.negative_handle_rate AS negativeHandleRate,
+        t.auth_handle_count AS authHandleCount,
+        t.queue_handle_count AS queueHandleCount,
+        t.identified_count AS identifiedCount,
+        t.call_handle_count AS callHandleCount,
+        t.reserve_handle_count AS reserveHandleCount
+        <if test="dateType=='day' ">
+            FROM SB_STATS_MKT_D T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test="dateType=='month' ">
+            FROM SB_STATS_MKT_M T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YM = #{timeValue}
+        </if>
+        <if test="dateType=='quarter' ">
+            FROM SB_STATS_MKT_Q T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_QUARTER = #{timeValue}
+        </if>
+        <if test="dateType=='year' ">
+            FROM SB_STATS_MKT_Y T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YEAR = #{timeValue}
+        </if>
+        <include refid="branchStatsTypeSql"/>
+    </select>
+
+    <select id="getUserBusiAccetpInfo" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.BusinessDomain">
+        select
+        t.push_count as pushCount,
+        t.receive_count as receiveCount,
+        t.receive_rate as recevieRate,
+        t.negative_count as negativeCount,
+        t.negative_handle_count as negativeHandleCount,
+        t.negative_handle_rate as negativeHandleRate,
+        t.auth_handle_count as authHandleCount,
+        t.queue_handle_count as queueHandleCount,
+        t.identified_count as identifiedCount,
+        t.reserve_handle_count as reserveHandleCount,
+        t.call_handle_count as callHandleCount
+        from
+        <if test="dateType=='day'">
+            SB_STATS_MKT_USER_D t where t.branch_no=#{orgid} and t.trade_date = to_number(SUBSTR(#{timeValue}, 10))
+			and t.user_no=#{tellerid}
+        </if>
+        <if test="dateType=='month'">
+            SB_STATS_MKT_USER_m t where t.branch_no=#{orgid} and t.trade_ym=#{timeValue} and t.user_no=#{tellerid}
+        </if>
+        <if test="dateType=='quarter'">
+            SB_STATS_MKT_USER_q t where t.branch_no=#{orgid} and t.trade_quarter=#{timeValue} and t.user_no=#{tellerid}
+        </if>
+        <if test="dateType=='year'">
+            SB_STATS_MKT_USER_y t where t.branch_no=#{orgid} and t.trade_year=#{timeValue} and t.user_no=#{tellerid}
+        </if>
+    </select>
+    <select id="getUserSaleInfoList" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        <include refid="selectUserByZero"/>
+        <include refid="selectForCompletionData"/>
+        <include refid="sqlByZeroBefore"/>
+        select
+        <if test="saleType == 'identify'">
+            t.mkt_c_count as count,
+            t.mkt_c_count_t_avg as avgValue ,
+            t.mkt_c_count_b_avg as branchAvg,
+            t.MKT_C_COUNT_RING as rate,
+        </if>
+        <if test="saleType == 'protential'">
+            t.potential_reg_count as count,
+            t.potential_reg_count_t_avg as avgValue,
+            t.potential_reg_count_b_avg as branchAvg,
+            t.POTENTIAL_REG_COUNT_RING as rate,
+        </if>
+        <if test="saleType == 'product'">
+            t.mkt_p_count as count,
+            t.mkt_p_count_t_avg as avgValue ,
+            t.mkt_p_count_b_avg as branchAvg,
+            t.MKT_P_COUNT_RING as rate,
+        </if>
+        <if test="saleType == 'reserve'">
+            t.reserve_reg_count as count,
+            t.reserve_reg_count_t_avg as avgValue ,
+            t.reserve_reg_count_b_avg as branchAvg,
+            t.RESERVE_REG_COUNT_RING as rate,
+        </if>
+        <if test="dateType=='day'">
+            t.trade_date as time
+        </if>
+        <if test="dateType=='month'">
+            t.trade_ym as time
+        </if>
+        <if test="dateType=='quarter'">
+            t.trade_quarter as time
+        </if>
+        <if test="dateType=='year'">
+            t.trade_year as time
+        </if>
+        from
+        <if test="dateType=='day'">
+            SB_STATS_MKT_user_d t where t.branch_no=#{orgid} and t.user_no=#{tellerid} and
+            TO_DATE(t.trade_date,'YYYYMMDD') BETWEEN
+			ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+        </if>
+        <if test="dateType=='month'">
+            SB_STATS_MKT_user_m t where t.branch_no=#{orgid} and t.user_no=#{tellerid} and
+            TO_DATE(t.trade_ym,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*13) AND
+            TO_DATE(#{timeValue},'YYYYMM')
+        </if>
+        <if test="dateType=='quarter'">
+            SB_STATS_MKT_user_q t where t.branch_no=#{orgid} and t.user_no=#{tellerid} and
+            TO_DATE(t.trade_quarter,'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-5*3) AND
+            TO_DATE(#{timeValue},'YYYYMM')
+        </if>
+        <if test="dateType=='year'">
+            SB_STATS_MKT_user_y t where t.branch_no=#{orgid} and t.user_no=#{tellerid} and
+            t.trade_year BETWEEN TO_NUMBER(#{timeValue})-4 AND TO_NUMBER(#{timeValue})
+        </if>
+        <include refid="sqlByZeroAfter"/>
+        <include refid="whereByLeftJoin"/>
+    </select>
+
+    <select id="getOrgAvgInfo" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        select t.mkt_c_count_t_avg,
+        t.mkt_c_count_b_avg,
+        t.mkt_p_count_t_avg,
+        t.mkt_p_count_b_avg,
+        t.potential_reg_count_t_avg,
+        t.potential_reg_count_b_avg,
+        t.reserve_reg_count_t_avg,
+        t.reserve_reg_count_b_avg
+        from
+        <if test="dateType=='day'">
+            SB_STATS_MKT_D t where t.branch_no=#{orgid} and t.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test="dateType=='month'">
+            SB_STATS_MKT_m t where t.branch_no=#{orgid} and t.TRADE_ym = #{timeValue}
+        </if>
+        <if test="dateType=='quarter'">
+            SB_STATS_MKT_q t where t.branch_no=#{orgid} and t.TRADE_quarter = #{timeValue}
+        </if>
+        <if test="dateType=='year'">
+            SB_STATS_MKT_y t where t.branch_no=#{orgid} and t.TRADE_year= #{timeValue}
+        </if>
+    </select>
+
+    <select id="getOrgUserAvgInfo" parameterType="java.util.Map" resultType="java.util.LinkedHashMap">
+        select t.mkt_c_count,
+        FLOOR(NVL(t.mkt_c_count_t_avg,0)) AS mkt_c_count_t_avg,
+        FLOOR(NVL(t.mkt_c_count_b_avg,0)) AS mkt_c_count_b_avg,
+        t.mkt_c_count_ring,
+        t.mkt_p_count,
+        FLOOR(NVL(t.mkt_p_count_t_avg,0)) AS mkt_p_count_t_avg,
+        FLOOR(NVL(t.mkt_p_count_b_avg,0)) AS mkt_p_count_b_avg,
+        t.mkt_p_count_ring,
+        t.potential_reg_count,
+        FLOOR(NVL(t.potential_reg_count_t_avg,0)) AS potential_reg_count_t_avg,
+        FLOOR(NVL(t.potential_reg_count_b_avg,0)) AS potential_reg_count_b_avg,
+        t.potential_reg_count_ring,
+        t.reserve_reg_count,
+        FLOOR(NVL(t.reserve_reg_count_t_avg,0)) AS reserve_reg_count_t_avg,
+        FLOOR(NVL(t.reserve_reg_count_b_avg,0)) AS reserve_reg_count_b_avg,
+        t.reserve_reg_count_ring
+        from
+        <if test="dateType=='day'">
+            SB_STATS_MKT_user_D t where t.branch_no=#{orgid} and t.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND ROWNUM = 1
+        </if>
+        <if test="dateType=='month'">
+            SB_STATS_MKT_user_m t where t.branch_no=#{orgid} and t.TRADE_ym = #{timeValue} AND ROWNUM = 1
+        </if>
+        <if test="dateType=='quarter'">
+            SB_STATS_MKT_user_q t where t.branch_no=#{orgid} and t.TRADE_quarter = #{timeValue} AND ROWNUM = 1
+        </if>
+        <if test="dateType=='year'">
+            SB_STATS_MKT_user_y t where t.branch_no=#{orgid} and t.TRADE_year= #{timeValue} AND ROWNUM = 1
+        </if>
+    </select>
+
+    <select id="getUserMarketRankTop" parameterType="java.util.Map"
+            resultType="com.dcfs.smartaibank.manager.operations.web.domain.HallMarketDomain">
+        SELECT TELLER_ID as tellerId,TELLER_NAME as tellerName,count,
+        FLOOR(NVL(branchAvg,0)) AS branchAvg,FLOOR(NVL(avgValue,0)) AS avgValue
+        FROM (SELECT T.user_no as TELLER_ID , T.user_name as TELLER_NAME, ROWNUM,
+        <if test="tradeType == 'marketCustomer'">
+            t.mkt_c_count as count,
+            t.mkt_c_count_b_avg as branchAvg,
+            t.mkt_c_count_t_avg as avgValue,
+            t.mkt_c_count_ring as rate
+        </if>
+        <if test="tradeType == 'marketProduct'">
+            t.mkt_p_count as count,
+            t.mkt_p_count_b_avg as branchAvg,
+            t.mkt_p_count_t_avg as avgValue,
+            t.mkt_p_count_ring as rate
+        </if>
+        <if test="tradeType == 'potential'">
+            t.potential_reg_count as count,
+            t.potential_reg_count_t_avg as avgValue,
+            t.potential_reg_count_b_avg as branchAvg,
+            t.potential_reg_count_ring as rate
+        </if>
+        <if test="tradeType == 'reserveBuy'">
+            t.reserve_reg_count as count,
+            t.reserve_reg_count_t_avg as avgValue,
+            t.reserve_reg_count_b_avg as branchAvg,
+            t.reserve_reg_count_ring as rate
+        </if>
+        FROM
+        <if test="dateType=='day'">
+            SB_STATS_MKT_user_d T
+            WHERE T.BRANCH_NO = #{orgid} AND T.trade_date = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test="dateType=='month'">
+            SB_STATS_MKT_user_m T
+            WHERE T.BRANCH_NO = #{orgid} AND T.trade_ym = #{timeValue}
+        </if>
+        <if test="dateType=='quarter'">
+            SB_STATS_MKT_user_q T
+            WHERE T.BRANCH_NO = #{orgid} AND T.trade_quarter = #{timeValue}
+        </if>
+        <if test="dateType=='year'">
+            SB_STATS_MKT_user_y T
+            WHERE T.BRANCH_NO = #{orgid} AND T.trade_year = #{timeValue}
+        </if>
+        order by
+        <if test="tradeType == 'marketCustomer'">
+            t.mkt_c_count desc
+        </if>
+        <if test="tradeType == 'marketProduct'">
+            t.mkt_p_count desc
+        </if>
+        <if test="tradeType == 'potential'">
+            t.potential_reg_count desc
+        </if>
+        <if test="tradeType == 'reserveBuy'">
+            t.reserve_reg_count desc
+        </if>
+        )
+    </select>
+</mapper>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.base.dao.ResourceDao">
+    <resultMap id="resource_result_map" type="com.dcfs.smartaibank.manager.base.domain.Resource">
+        <id property="id" column="RESOURCEID"/>
+        <result property="parent" column="PARENT"/>
+        <result property="name" column="RESOURCENAME"/>
+        <result property="type" column="RESOURCETYPEID"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="systemId" column="SYSTEMID"/>
+        <collection property="operationMode" javaType="List" ofType="com.dcfs.smartaibank.manager.base.domain.OperationMode">
+            <id property="id" column="OPERATIONMODE"></id>
+            <result property="name" column="MODENAME"></result>
+        </collection>
+        <collection property="mutexs" javaType="List" ofType="String">
+            <result column="MUTEX"></result>
+        </collection>
+    </resultMap>
+    <!-- 根据用户id和系统id查询该用户可访问资源信息 -->
+    <select id="selectAccessResourceByUserIdAndSystemId" parameterType="map" resultMap="resource_result_map">
+        SELECT DISTINCT t.RESOURCEID,
+                        t.PARENT,
+                        t.RESOURCENAME,
+                        t.RESOURCETYPEID,
+                        t.SYSTEMID,
+                        x.MUTEX,
+                        m.OPERATIONMODE,
+                        d.MODENAME
+          FROM tl9_roleaccessresource c
+               LEFT JOIN tl9_resourcebasic t
+                  ON c.RESOURCEID = t.RESOURCEID
+               LEFT JOIN TL9_RESOURCE_MUTEX x
+                  ON t.RESOURCEID=x.RESOURCEID
+               LEFT JOIN TL9_ROLE_RESOURCE_MODE m
+                  ON     m.ROLEID = c.ROLEID
+                     AND m.PARENTKEY = c.PARENTKEY
+                     AND m.RESOURCEID = c.RESOURCEID
+                     AND m.SYSTEMID = C.SYSTEMID
+               LEFT JOIN TL9_OPERATIONMODE_DESC d
+                  ON d.OPERATIONMODE = m.OPERATIONMODE
+         WHERE (c.ROLEID, c.SYSTEMID) IN
+                  (SELECT U.ROLEID, U.SYSTEMID
+                     FROM tl9_userrole u
+                    WHERE U.USERID = #{userId} AND U.SYSTEMID = #{systemId})
+    </select>
+    <select id="selectBySystemId" parameterType="string" resultMap="resource_result_map">
+          select t.RESOURCEID,t.PARENT,t.RESOURCENAME,
+                 t.RESOURCETYPEID,t.SYSTEMID,m.MUTEX,o.OPERATIONMODE,d.MODENAME
+            from tl9_resourcebasic t
+            left join TL9_RESOURCE_MUTEX m on t.RESOURCEID=m.RESOURCEID
+            left join TL9_RESOURCE_OPERATIONMODE o on o.RESOURCEID=t.RESOURCEID
+            left join TL9_OPERATIONMODE_DESC d on d.OPERATIONMODE=o.OPERATIONMODE
+         where t.SYSTEMID = #{systemId,jdbcType=VARCHAR}
+    </select>
+</mapper>

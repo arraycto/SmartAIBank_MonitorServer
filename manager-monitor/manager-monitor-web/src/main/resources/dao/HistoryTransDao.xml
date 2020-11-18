@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.HistoryTransDao">
+
+	<resultMap id="base_result_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryTransInfo">
+		<result property="seqNo" column="SEQ_NO" />
+		<result property="tranStatus" column="STATUS_NAME" />
+		<result property="tranName" column="TRAN_TYPE_NAME"/>
+		<result property="tranDate" column="TRAN_DATE"/>
+		<result property="fieldName" column="FIELD_NAME" />
+		<result property="deviceId" column="MID"/>
+		<result property="devClassName" column="MCLASSNAME" />
+		<result property="branchName" column="BRANCH_NAME"/>
+		<result property="tranAmt" column="TRAN_AMT" />
+		<result property="tranCardNo" column="TRAN_CARD_NO" />
+		<result property="tranCardType" column="TRAN_CARD_TYPE" />
+		<result property="tranRetCode" column="TRAN_RET_CODE" />
+		<result property="tranRetDesc" column="TRAN_RET_DESC" />
+	</resultMap>
+
+	<!-- 查询所有设备预警信息-->
+	<select id="getHistroyTransList" resultMap="base_result_map">
+		SELECT T.TRAN_STATUS,
+		CASE T.TRAN_STATUS
+		WHEN 1 THEN '失败'
+		WHEN 2 THEN '异常'
+		WHEN 3 THEN '成功'
+		END
+		STATUS_NAME,
+		T.TRAN_RET_CODE,
+		T.TRAN_RET_DESC,
+		T.TRAN_DATE,
+		T.TRAN_TYPE,
+		M.CODE_DESC AS TRAN_TYPE_NAME,
+		T.SEQ_NO,
+		T.MID,
+		T.MCLASSKEY,
+		C.DEVCLASSNAME AS MCLASSNAME,
+		T.BRANCH_NO,
+		T.BRANCH_NO ||' - '|| O.ORGNAME_CN AS BRANCH_NAME,
+		T.FIELD_NO,
+		T.FIELD_NAME,
+		T.TRAN_AMT,
+		T.TRAN_CARD_NO,
+		CASE T.TRAN_CARD_TYPE
+		WHEN 'CC_CARD' THEN '公务卡'
+		WHEN 'IC_CARD' THEN '芯片卡'
+		WHEN 'MC_CARD' THEN '磁条卡'
+		END
+		TRAN_CARD_TYPE
+		FROM MAS_TRAN_INFO T
+		INNER JOIN TL9_ORGBASIC O
+		ON T.BRANCH_NO = O.ORGID
+		LEFT JOIN TL9_DEVICE_CLASS C
+		ON T.MCLASSKEY = C.DEVCLASSKEY
+		LEFT JOIN MAS_MONITOR_CONFIG M
+		ON T.TRAN_TYPE = M.CODE_VALUE
+		WHERE T.BRANCH_NO in
+		(SELECT ORGID
+		FROM tl9_orgbasic t
+		START WITH t.ORGID = #{branchId,jdbcType=VARCHAR} AND t.ORGSTATUSTYPEID != '0'
+		CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.ORGID
+		AND t.ORGSTATUSTYPEID != '0')
+		AND M.TYPE_NO='DICT'
+		<if test="historyTransParams.devClassKey !=null and historyTransParams.devClassKey != ''">
+			AND T.MCLASSKEY=#{historyTransParams.devClassKey}
+		</if>
+		<if test="historyTransParams.deviceId !=null and historyTransParams.deviceId != ''">
+			AND T.MID like '%'||#{historyTransParams.deviceId}||'%'
+		</if>
+		AND T.TRAN_DATE &lt;= to_date(#{historyTransParams.endDate} || '23:59:59','yyyy-MM-dd HH24:mi:ss')
+		AND T.TRAN_DATE &gt;= to_date(#{historyTransParams.startDate} || '00:00:00' ,'yyyy-MM-dd HH24:mi:ss')
+		ORDER BY TRAN_DATE DESC
+	</select>
+</mapper>

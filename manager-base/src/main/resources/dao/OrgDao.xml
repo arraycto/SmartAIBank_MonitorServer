@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.base.dao.OrgDao">
+    <resultMap id="base_result_map" type="com.dcfs.smartaibank.manager.base.domain.Org">
+        <result property="id" column="ORGID"/>
+        <result property="name" column="ORGNAME_CN"/>
+        <result property="phone.country" column="PHONE_COUNTRY"/>
+        <result property="phone.area" column="PHONE_AREA"/>
+        <result property="phone.no" column="PHONE_NO"/>
+        <result property="phone.sub" column="PHONE_SUBNO"/>
+        <result property="type" column="ORGTYPEID"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="level" column="ORGLEVELID"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="reportLevel" column="REPORT_LEVEL"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="address.country" column="ADDRESS_COUNTRY"/>
+        <result property="address.province" column="ADDRESS_PROVINCE"/>
+        <result property="address.city" column="ADDRESS_CITY"/>
+        <result property="address.county" column="ADDRESS_COUNTY"/>
+        <result property="address.town" column="ADDRESS_TOWN"/>
+        <result property="address.street" column="ADDRESS_STREET"/>
+        <result property="businessSuperior" column="BUSINESS_SUPERIOR"/>
+        <result property="accountSuperior" column="ACCOUNT_SUPERIOR"/>
+        <result property="createTime" column="CREATETIME"/>
+        <result property="updateTime" column="UPDATETIME"/>
+        <result property="levelName" column="ORGLEVELNAME"/>
+        <result property="typeName" column="ORGTYPENAME"/>
+        <result property="reportLevelName" column="REPORTLEVELNAME"/>
+        <result property="busSupName" column="busSupName"/>
+        <result property="addressDesc" column="address_desc"/>
+    </resultMap>
+    <sql id="simple_column_list">
+		org.ORGID,
+        org.ORGNAME_CN,
+        org.ORGTYPEID,
+        org.ORGLEVELID,
+        org.BUSINESS_SUPERIOR,
+        org.REPORT_LEVEL
+	</sql>
+    <sql id="base_column_list">
+		org.ORGID,
+        org.ORGNAME_CN,
+        org.ORGTYPEID,
+        org.ORGLEVELID,
+        org.REPORT_LEVEL,
+        org.BUSINESS_SUPERIOR,
+        org.ACCOUNT_SUPERIOR,
+        org.ADDRESS_COUNTRY,
+        org.ADDRESS_PROVINCE,
+        org.ADDRESS_CITY,
+        org.ADDRESS_COUNTY,
+        org.ADDRESS_TOWN,
+        org.ADDRESS_STREET,
+        org.PHONE_COUNTRY,
+        org.PHONE_AREA,
+        org.PHONE_NO,
+        org.PHONE_SUBNO
+	</sql>
+    <sql id="base_from">
+        from TL9_ORGBASIC org
+    </sql>
+    <sql id="base_where_list">
+        where org.ORGSTATUSTYPEID !='0'
+    </sql>
+    <sql id="superior_where_list">
+        START WITH QUERY_SUPERIOR =  #{userOrgId}
+         CONNECT BY QUERY_SUPERIOR = PRIOR orgid
+    </sql>
+    <sql id="address_column_list">
+        country.COUNTRY_DESC ||
+        province.PROVINCE_DESC ||
+		city.CITY_DESC ||
+		county.COUNTY_DESC ||
+        town.TOWN_DESC as address_desc
+	</sql>
+    <sql id="code_column_list">
+        a.ORGLEVELNAME,
+        b.ORGTYPENAME,
+		lev.ORGLEVELNAME as REPORTLEVELNAME
+	</sql>
+    <sql id="address_left_join">
+        left join TL9_COUNTRY country on  country.COUNTRY_CODE = org.ADDRESS_COUNTRY
+        left join TL9_PROVINCE province on  province.PROVINCE_CODE = org.ADDRESS_PROVINCE
+        left join TL9_CITY city on  city.CITY_CODE = org.ADDRESS_CITY
+        left join TL9_COUNTY county on  county.COUNTY_CODE = org.ADDRESS_COUNTY
+        left join TL9_TOWN town on  town.TOWN_CODE = org.ADDRESS_TOWN
+    </sql>
+    <sql id="code_left_join">
+        left join TL9_ORGLEVEL a on  org.ORGLEVELID = a.ORGLEVELID
+        left join TL9_ORGTYPE b on org.ORGTYPEID = b.ORGTYPEID
+        left join TL9_ORGLEVEL lev on  org.REPORT_LEVEL = lev.ORGLEVELID
+    </sql>
+    <sql id ="detail_where_list">
+        where 1=1
+    <if test="id !='' and id !=null">
+        and org.ORGID=#{id}
+    </if>
+    <if test="name !='' and name !=null">
+        and org.ORGNAME_CN like '%'||#{name}||'%'
+    </if>
+    <if test="level !=null">
+        and org.ORGLEVELID=#{level,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+    </if>
+    <if test="type !=null">
+        and org.ORGTYPEID=#{type,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+    </if>
+    </sql>
+    <insert id="insert" parameterType="com.dcfs.smartaibank.manager.base.domain.Org">
+        INSERT INTO TL9_ORGBASIC(
+        ORGID,
+        ORGNAME_CN,
+        ORGTYPEID,
+        ORGLEVELID,
+        REPORT_LEVEL,
+        QUERY_SUPERIOR,
+        BUSINESS_SUPERIOR,
+        ACCOUNT_SUPERIOR,
+        ORGSTATUSTYPEID,
+        CREATETIME,
+        ADDRESS_COUNTRY,
+        ADDRESS_PROVINCE,
+        ADDRESS_CITY,
+        ADDRESS_COUNTY,
+        ADDRESS_TOWN,
+        ADDRESS_STREET,
+        MEDIUMTYPEID,
+        PHONE_COUNTRY,
+        PHONE_AREA,
+        PHONE_NO,
+        PHONE_SUBNO
+    )
+    VALUES
+    (   #{id,jdbcType=VARCHAR},
+        #{name,jdbcType=VARCHAR},
+        #{type,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        #{level,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        #{reportLevel,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        #{businessSuperior,jdbcType=VARCHAR},
+        #{businessSuperior,jdbcType=VARCHAR},
+        #{accountSuperior,jdbcType=VARCHAR},
+        '1',
+        #{createTime, jdbcType=DATE},
+        #{address.country,jdbcType=VARCHAR},
+        #{address.province,jdbcType=VARCHAR},
+        #{address.city,jdbcType=VARCHAR},
+        #{address.county,jdbcType=VARCHAR},
+        #{address.town,jdbcType=VARCHAR},
+        #{address.street,jdbcType=VARCHAR},
+        '1',
+        #{phone.country,jdbcType=VARCHAR},
+        #{phone.area,jdbcType=VARCHAR},
+        #{phone.no,jdbcType=VARCHAR},
+        #{phone.sub,jdbcType=VARCHAR}
+    )
+    </insert>
+    <select id="selectByPrimaryKey" parameterType="String" resultMap="base_result_map">
+        select
+        <include refid="base_column_list"/>
+        <include refid="address_column_list"/>
+        <include refid="code_column_list"/>
+        <include refid="base_from"/>
+        <include refid="address_left_join"/>
+        <include refid="code_left_join"/>
+        <include refid="base_where_list"/>
+        <if test="id !='' and id !=null">
+            and org.ORGID=#{id}
+        </if>
+    </select>
+    <select id="selectAll" parameterType="com.dcfs.smartaibank.manager.base.domain.Org" resultMap="base_result_map">
+        select
+        <include refid="simple_column_list"/>
+        <include refid="base_from"/>
+        <include refid="base_where_list"/>
+        and org.ORGID = #{userOrgId}
+        union
+        select
+        <include refid="simple_column_list"/>
+        <include refid="base_from"/>
+        <include refid="superior_where_list"/>
+    </select>
+    <select id="select" parameterType="com.dcfs.smartaibank.manager.base.domain.Org" resultMap="base_result_map">
+        select org.*,dd.ORGNAME_CN as busSupName,
+        <include refid="code_column_list"/>
+        from(select <include refid="simple_column_list"/>
+        <include refid="base_from"/>
+        <include refid="base_where_list"/>
+        and org.ORGID = #{userOrgId}
+        union select
+        <include refid="simple_column_list"/>
+        <include refid="base_from"/>
+        <include refid="superior_where_list"/>
+        ) org
+        <include refid="code_left_join"/>
+        left join TL9_ORGBASIC dd on org.BUSINESS_SUPERIOR = dd.ORGID
+        <include refid="detail_where_list"/>
+    </select>
+    <select id="selectOrgSuperior" parameterType="com.dcfs.smartaibank.manager.base.domain.Org" resultType="java.lang.Integer">
+    select count(1)
+    from tl9_orgbasic t
+    where t.QUERY_SUPERIOR =#{id} and t.ORGSTATUSTYPEID != '0'
+    </select>
+
+    <select id="selectOrgUser" parameterType="com.dcfs.smartaibank.manager.base.domain.Org" resultType="java.lang.Integer">
+    select count(1)
+    from tl9_userbasic t
+    where t.ORGID =#{id}
+    and t.USEFLAG='10'
+    </select>
+
+    <update id="updateOrgId">
+        update
+        TL9_ORGBASIC t
+        set t.ORGSTATUSTYPEID = '0'
+        where t.ORGID =#{id}
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.dcfs.smartaibank.manager.base.domain.Org">
+       UPDATE tl9_orgbasic set
+        ORGNAME_CN = #{name, jdbcType=VARCHAR},
+        ORGTYPEID = #{type, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        ORGLEVELID = #{level, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        REPORT_LEVEL = #{reportLevel, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        QUERY_SUPERIOR = #{businessSuperior, jdbcType=VARCHAR},
+        BUSINESS_SUPERIOR = #{businessSuperior, jdbcType=VARCHAR},
+        ACCOUNT_SUPERIOR = #{accountSuperior, jdbcType=VARCHAR},
+        PHONE_COUNTRY = #{phone.country, jdbcType=VARCHAR},
+        PHONE_AREA = #{phone.area, jdbcType=VARCHAR},
+        PHONE_NO = #{phone.no, jdbcType=VARCHAR},
+        PHONE_SUBNO = #{phone.sub, jdbcType=VARCHAR},
+        ADDRESS_COUNTRY = #{address.country, jdbcType=VARCHAR},
+        ADDRESS_PROVINCE = #{address.province, jdbcType=VARCHAR},
+        ADDRESS_CITY = #{address.city, jdbcType=VARCHAR},
+        ADDRESS_COUNTY = #{address.county, jdbcType=VARCHAR},
+        ADDRESS_TOWN = #{address.town, jdbcType=VARCHAR},
+        ADDRESS_STREET = #{address.street, jdbcType=VARCHAR},
+        UPDATETIME = #{updateTime, jdbcType=DATE}
+        WHERE orgid =#{id, jdbcType=VARCHAR}
+    </update>
+
+    <select id="selectLevel" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.base.domain.SpareDataDomain">
+        SELECT ORGLEVELID as key ,ORGLEVELNAME as value from TL9_ORGLEVEL
+        where ORGLEVELID != '1'
+        <if test="type == '6' ">
+            and ORGLEVELID  = '3'
+        </if>
+        <if test="type == '6' ">
+            and ORGLEVELID in ('2','3')
+        </if>
+    </select>
+    <select id="selectBussSuperior" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.base.domain.SpareDataDomain">
+        SELECT ORGID as key ,ORGNAME_CN as value from TL9_ORGBASIC
+        where ORGTYPEID in ('3','5')
+        <if test="level == '3' ">
+            and ORGLEVELID  in ('1','2')
+        </if>
+        <if test="level == '4' ">
+            and ORGLEVELID = '3'
+        </if>
+    </select>
+    <select id="selectAccSuperior" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.base.domain.SpareDataDomain">
+        SELECT ORGID as key ,ORGNAME_CN as value from TL9_ORGBASIC
+        where ORGTYPEID in ('1','5')
+    </select>
+
+
+
+</mapper>

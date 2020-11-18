@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.dcfs.smartaibank.springboot</groupId>
+        <artifactId>smartaibank-spring-boot-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <groupId>com.dcfs.smartaibank.manager</groupId>
+    <artifactId>manager-parent</artifactId>
+    <version>${revision}</version>
+    <packaging>pom</packaging>
+
+    <name>manager-parent</name>
+    <description>管理平台</description>
+
+    <modules>
+        <module>manager-base</module>
+        <module>manager-starter</module>
+        <module>manager-operations</module>
+        <module>manager-monitor</module>
+    </modules>
+
+    <organization>
+        <name>DCITS</name>
+    </organization>
+    <developers>
+        <developer>
+            <id>jiazw</id>
+            <email>jiazw@dcits.com</email>
+            <roles>
+                <role>Owner</role>
+                <role>Founder</role>
+                <role>Committer</role>
+            </roles>
+        </developer>
+    </developers>
+    <issueManagement>
+        <system>redmine</system>
+        <url>http://10.7.20.158:81/redmine</url>
+    </issueManagement>
+
+    <properties>
+        <revision>1.0.0</revision>
+        <smartaibank.version>1.0.0</smartaibank.version>
+        <smartaibank-spring-boot.version>1.0.0</smartaibank-spring-boot.version>
+    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.dcfs.smartaibank</groupId>
+                <artifactId>smartaibank-core</artifactId>
+                <version>${smartaibank.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dcfs.smartaibank.springboot</groupId>
+                <artifactId>smartaibank-spring-boot-core</artifactId>
+                <version>${smartaibank-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dcfs.smartaibank.springboot.starters</groupId>
+                <artifactId>schedule-spring-boot-starter</artifactId>
+                <version>${smartaibank-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dcfs.smartaibank.springboot.starters</groupId>
+                <artifactId>swagger2-spring-boot-starter</artifactId>
+                <version>${smartaibank-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dcfs.smartaibank.springboot.starters</groupId>
+                <artifactId>security-spring-boot-starter</artifactId>
+                <version>${smartaibank-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dcfs.smartaibank.springboot.starters</groupId>
+                <artifactId>websocket-spring-boot-starter</artifactId>
+                <version>${smartaibank-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dcfs.smartaibank.springboot</groupId>
+                <artifactId>smartaibank-spring-boot-integration</artifactId>
+                <version>${smartaibank-spring-boot.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

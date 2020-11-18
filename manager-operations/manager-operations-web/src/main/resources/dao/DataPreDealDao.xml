@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.DataPreDealDao">
+	<insert id="insertCustomerInfo"
+			parameterType="com.dcfs.smartaibank.manager.operations.web.batch.domain.CustomerInfoDomain">
+        INSERT INTO TEMP_CUSTOMER_INFO (
+                     CUSTOMER_ID,
+                     CUSTOMER_NAME,
+                     CUSTOMER_TYPE,
+                     CUSTOMER_LEVEL,
+                     IDENTITY_TYPE,
+                     IDENTIFY_NO,
+                     BRANCH_NO,
+                     BIRTHDAY,
+					 CUSTOMER_AGE_STEP,
+					 CUSTOMER_SEX,
+					 CUSTOMER_BALANCE_STEP
+          )
+        VALUES  (#{customerNo,jdbcType=VARCHAR},
+        #{customerName,jdbcType=VARCHAR},
+        #{customerType,jdbcType=VARCHAR},
+        #{customerLevel,jdbcType=VARCHAR},
+        #{identifyType,jdbcType=VARCHAR},
+        #{identifyNo,jdbcType=VARCHAR},
+        #{branchNo,jdbcType=VARCHAR},
+        #{birthday,jdbcType=VARCHAR},
+        #{customerAgeStep,jdbcType=VARCHAR},
+        #{customerSex,jdbcType=VARCHAR},
+        #{customerBalanceStep,jdbcType=VARCHAR})
+    </insert>
+	<update id="updateCustomerInfo"
+			parameterType="com.dcfs.smartaibank.manager.operations.web.batch.domain.CustomerInfoDomain">
+        UPDATE TEMP_CUSTOMER_INFO t
+        	SET t.CUSTOMER_NAME = #{customerName,jdbcType=VARCHAR},
+				 t.CUSTOMER_TYPE = #{customerType,jdbcType=VARCHAR},
+				 t.CUSTOMER_LEVEL = #{customerLevel,jdbcType=VARCHAR},
+				 t.IDENTITY_TYPE = #{identifyType,jdbcType=VARCHAR},
+				 t.IDENTIFY_NO = #{identifyNo,jdbcType=VARCHAR},
+				 t.BRANCH_NO = #{branchNo,jdbcType=VARCHAR},
+				 t.BIRTHDAY = #{birthday,jdbcType=VARCHAR},
+				 t.CUSTOMER_AGE_STEP = #{customerAgeStep,jdbcType=VARCHAR},
+				 t.CUSTOMER_SEX = #{customerSex,jdbcType=VARCHAR}
+        WHERE t.CUSTOMER_ID= #{customerNo,jdbcType=VARCHAR}
+    </update>
+	<insert id="insertTradeinfo"
+			parameterType="com.dcfs.smartaibank.manager.operations.web.batch.domain.TradeInfoDomain">
+        INSERT INTO TEMP_TRADE_INFO T  (
+          T.TRADE_SEQ,
+          T.TRAN_CODE,
+          T.TRAN_NAME,
+          T.CHANNEL_TYPE,
+          T.BRANCH_NO,
+          T.USER_NO,
+          T.TRADE_DATE,
+          T.START_TIME,
+          T.END_TIME,
+          T.Ticket_No,T.CUSTOMER_ID
+        ) VALUES(SEQ_TEMP_TRADE_SEQ.NEXTVAL,#{tradeCode,jdbcType=VARCHAR},
+                #{tradeName,jdbcType=VARCHAR},
+                #{channelType,jdbcType=VARCHAR},#{branchNo,jdbcType=VARCHAR},
+                #{userNo,jdbcType=VARCHAR},#{tradeDate,jdbcType=NUMERIC},
+                TO_DATE(#{startTime,jdbcType=VARCHAR},'yyyymmdd hh24:mi:ss'),
+                TO_DATE(#{endTime,jdbcType=VARCHAR},'yyyymmdd hh24:mi:ss'),
+                #{tickNo,jdbcType=VARCHAR},
+                #{cutomerId,jdbcType=VARCHAR})
+    </insert>
+
+	<insert id="insertCustomerAssetInfo"
+			parameterType="com.dcfs.smartaibank.manager.operations.web.batch.domain.CustomerAssetsDomain">
+		INSERT INTO TEMP_CUST_ASSETS (customer_id,
+          AMT_BAL,
+          CUSTOMER_BALANCE_STEP)
+         VALUES(#{customerNo},
+         #{amtBal},
+         #{customerBalanceStep})
+    </insert>
+
+	<select id="hallMarketDataDeal" statementType="CALLABLE" parameterType="java.util.Map">
+        {call sb_stats_hallmarket_deal(
+                    #{date,jdbcType=VARCHAR,mode=IN},
+                    #{message,jdbcType=VARCHAR,mode=OUT})
+          }
+    </select>
+	<select id="tradeDataDeal" statementType="CALLABLE" parameterType="java.util.Map">
+        {call sb_stats_tradedata_deal(
+                    #{date,jdbcType=VARCHAR,mode=IN},
+                    #{message,jdbcType=VARCHAR,mode=OUT})
+          }
+    </select>
+	<select id="queueDataDeal" statementType="CALLABLE" parameterType="java.util.Map">
+        {call sb_stats_queue_deal(
+                #{date,jdbcType=VARCHAR,mode=IN},
+                #{message,jdbcType=VARCHAR,mode=OUT})
+            }
+    </select>
+	<select id="custRoutesDataDeal" statementType="CALLABLE" parameterType="java.util.Map">
+        {call sb_stats_custroutes_deal(
+                #{date,jdbcType=VARCHAR,mode=IN},
+                #{message,jdbcType=VARCHAR,mode=OUT})
+            }
+    </select>
+
+	<select id="custDataDeal" statementType="CALLABLE" parameterType="java.util.Map">
+        {call sb_stats_custdata_deal(
+                #{date,jdbcType=VARCHAR,mode=IN},
+                #{message,jdbcType=VARCHAR,mode=OUT})
+            }
+    </select>
+
+	<delete id="truncateTempCustomerInfo">
+		TRUNCATE TABLE TEMP_CUSTOMER_INFO
+	</delete>
+
+	<delete id="truncateTempCustAssets">
+		TRUNCATE TABLE TEMP_CUST_ASSETS
+	</delete>
+</mapper>
+

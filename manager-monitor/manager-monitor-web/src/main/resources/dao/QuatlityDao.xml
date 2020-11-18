@@ -1,0 +1,712 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.QualityDao">
+
+    <sql id="simple_select">
+       select t2.*,rownum as "rowNum"
+        from (
+        SELECT
+        branch_no,
+        <if test='queryType =="eva"'>
+            CASE EVALUATE_INVITE_COUNT
+            WHEN 0 THEN NULL
+            ELSE ROUND (EVALUATE_COUNT / EVALUATE_INVITE_COUNT, 4) * 100
+            END
+            as "evaluateRate", /* 评价率 */
+        </if>
+        <if test='queryType =="good"'>
+            CASE EVALUATE_COUNT
+            WHEN 0 THEN NULL
+            ELSE ROUND (EVALUATE_GOOD_COUNT / EVALUATE_COUNT, 4) * 100
+            END
+            as "evaluateRate",/* 好评率 */
+        </if>
+        <if test='queryType =="mid"'>
+            CASE EVALUATE_COUNT
+            WHEN 0 THEN NULL
+            ELSE ROUND (EVALUATE_MID_COUNT / EVALUATE_COUNT, 4) * 100
+            END
+            as "evaluateRate", /* 中评率 */
+        </if>
+        <if test='queryType =="bad"'>
+            CASE EVALUATE_COUNT
+            WHEN 0 THEN NULL
+            ELSE ROUND (EVALUATE_BAD_COUNT / EVALUATE_COUNT, 4) * 100
+            END
+            as "evaluateRate", /* 差评率 */
+        </if>
+        <if test='queryType =="customer"'>
+            CASE TOTAL
+            WHEN 0 THEN NULL
+            ELSE ROUND (CUSTOMER_ID_COUNT / TOTAL, 4) * 100
+            END
+            as "evaluateRate", /* 客户身份识别率 */
+        </if>
+        t.orgname_cn as "branchName"
+        FROM MAS_QUEUE_BRANCH_Q
+        left JOIN tl9_orgbasic t
+        on t.orgid=branch_no
+        where branch_no in (select orgid
+        from TL9_ORGBASIC
+        WHERE orgstatustypeid!='0'
+        START WITH orgid = #{branchNo}
+        CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid )
+       order by "evaluateRate"
+       <if test="queryType !='bad'">
+          desc
+       </if>
+        nulls last
+       )t2
+    </sql>
+
+    <sql id="simple_where_chose">
+        <choose>
+            <when test="isManager">
+                in (select orgid
+                from TL9_ORGBASIC
+                WHERE orgstatustypeid!='0'
+                START WITH orgid = #{branchNo}
+                CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid )
+            </when>
+            <otherwise>
+                = #{branchNo}
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="with_simple_sql">
+        SELECT
+        branch_no,
+        quality_status as qualityLevel,
+        CASE EVALUATE_INVITE_COUNT
+        WHEN 0 THEN null
+        ELSE ROUND (EVALUATE_COUNT / EVALUATE_INVITE_COUNT, 4) * 100
+        END as evaluateRate
+        , /* 评价率 */
+        CASE EVALUATE_COUNT
+        WHEN 0 THEN null
+        ELSE ROUND (EVALUATE_GOOD_COUNT / EVALUATE_COUNT, 4) * 100
+        END
+        as evaluateGoodRate,/* 好评率 */
+        CASE EVALUATE_COUNT
+        WHEN 0 THEN null
+        ELSE ROUND (EVALUATE_MID_COUNT / EVALUATE_COUNT, 4) * 100
+        END
+         as evaluateMidRate, /* 中评率 */
+        CASE EVALUATE_COUNT
+        WHEN 0 THEN null
+        ELSE ROUND (EVALUATE_BAD_COUNT / EVALUATE_COUNT, 4) * 100
+        END
+         as evaluateBadRate, /* 差评率 */
+        CASE TOTAL
+        WHEN 0 THEN null
+        ELSE ROUND (CUSTOMER_ID_COUNT / TOTAL, 4) * 100
+        END
+        as customerRate, /* 客户身份识别率 */
+        EVALUATE_BAD_COUNT as evaluateBadCount, /* 差评数 */
+        branch_no||'-'||t.orgname_cn as "branchName"
+        FROM MAS_QUEUE_BRANCH_Q
+        left JOIN tl9_orgbasic t
+        on t.orgid=branch_no
+        where branch_no in (select orgid
+        from TL9_ORGBASIC
+        WHERE orgstatustypeid!='0'
+        START WITH orgid = #{branchNo}
+        CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid )
+    </sql>
+
+    <sql id="branch_quality_level_select">
+        CASE STATUSCOUNT
+          WHEN 0 THEN NULL
+          ELSE ROUND (BAD_COUNT / STATUSCOUNT, 4) * 100
+       END
+          as "statusBadRate", 			/*  网点 差占比  */
+       CASE STATUSCOUNT
+          WHEN 0 THEN NULL
+          ELSE ROUND (MIDDLE_COUNT / STATUSCOUNT, 4) * 100
+       END
+           as "statusMiddleRate",		/*  网点 中占比  */
+       CASE STATUSCOUNT
+          WHEN 0 THEN NULL
+          ELSE ROUND (NICE_COUNT / STATUSCOUNT, 4) * 100
+       END
+           as "statusNiceRate",			/*  网点 良占比  */
+       CASE STATUSCOUNT
+          WHEN 0 THEN NULL
+          ELSE ROUND (GOOD_COUNT / STATUSCOUNT, 4) * 100
+       END
+          as "statusGoodRate",			/*  网点 优占比  */
+          BAD_COUNT as "statusBadCount",
+          MIDDLE_COUNT as "statusMiddleCount",
+          NICE_COUNT as "statusNiceCount",
+          GOOD_COUNT as "statusGoodCount"
+    </sql>
+
+    <sql id="branch_quality_rate_select">
+         CASE EVALUATE_INVITE_COUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (EVALUATE_COUNT / EVALUATE_INVITE_COUNT, 4) * 100
+        END
+        as "evaluateRate", /* 评价率 */
+        CASE EVALUATE_COUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (EVALUATE_GOOD_COUNT / EVALUATE_COUNT, 4) * 100
+        END
+        as "evaluateGoodRate",/* 好评率 */
+        CASE EVALUATE_COUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (EVALUATE_MID_COUNT / EVALUATE_COUNT, 4) * 100
+        END
+        as "evaluateMidRate", /* 中评率 */
+        CASE EVALUATE_COUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (EVALUATE_BAD_COUNT / EVALUATE_COUNT, 4) * 100
+        END
+        as "evaluateBadRate", /* 差评率 */
+
+        EVALUATE_BAD_COUNT as "evaluateBadCount"/* 差评数 */
+    </sql>
+
+    <sql id="evaluate_rate_count">
+        SUM (EVALUATE_COUNT) EVALUATE_COUNT, /*评价总数*/
+        SUM (EVALUATE_INVITE_COUNT) EVALUATE_INVITE_COUNT, /*评价邀约总数*/
+        SUM (EVALUATE_GOOD_COUNT) EVALUATE_GOOD_COUNT, /*好评总数*/
+        SUM (EVALUATE_MID_COUNT) EVALUATE_MID_COUNT, /*中评总数*/
+        SUM (EVALUATE_BAD_COUNT) EVALUATE_BAD_COUNT /*差评总数*/
+    </sql>
+    <sql id="evaluate_level_count">
+          COUNT (1) STATUSCOUNT,                             /*服务质量等级总数量*/
+	                 COUNT (CASE QUALITY_STATUS WHEN '1' THEN 1 ELSE NULL END)
+	                    BAD_COUNT,                                      /*等级差数*/
+	                 COUNT (CASE QUALITY_STATUS WHEN '2' THEN 1 ELSE NULL END)
+	                    MIDDLE_COUNT,                                    /*等级中数*/
+	                 COUNT (CASE QUALITY_STATUS WHEN '3' THEN 1 ELSE NULL END)
+	                    NICE_COUNT,                                      /*等级良数*/
+	                 COUNT (CASE QUALITY_STATUS WHEN '4' THEN 1 ELSE NULL END)
+	                    GOOD_COUNT                                       /*等级优数*/
+    </sql>
+    <select id="queryQualityRate" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QualityRate">
+        SELECT
+		CASE TOTAL
+          WHEN 0 THEN NULL
+          ELSE ROUND (CUSTOMER_ID_COUNT / TOTAL, 4) * 100
+       END
+          as "customerRate",								/*  客户身份识别率  */
+          <include refid="branch_quality_rate_select"></include>,
+          STATUSCOUNT as "total",
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (BAD_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusBadRate", 			/*  网点 差占比  */
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (MIDDLE_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusMiddleRate",		/*  网点 中占比  */
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (NICE_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusNiceRate",			/*  网点 良占比  */
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (GOOD_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusGoodRate",			/*  网点 优占比  */
+        CASE
+        STATUSCOUNT
+        WHEN 0 THEN
+        NULL ELSE ROUND( un_Count / STATUSCOUNT, 4 ) * 100
+        END AS "statusUnDealRate",
+        BAD_COUNT as "statusBadCount",
+        MIDDLE_COUNT as "statusMiddleCount",
+        NICE_COUNT as "statusNiceCount",
+        GOOD_COUNT as "statusGoodCount",
+        un_Count  as "statusUnDealCount"
+	  FROM (
+          select a.*,
+        ( SELECT count( 1 ) FROM MAS_QUEUE_BRANCH_Q WHERE QUALITY_STATUS = 1 AND TOTAL != 0
+        and branch_no
+        <include refid="simple_where_chose"></include>
+        ) AS BAD_COUNT ,
+        ( SELECT count( 1 ) FROM MAS_QUEUE_BRANCH_Q WHERE QUALITY_STATUS = 1 AND TOTAL = 0
+        and branch_no
+        <include refid="simple_where_chose"></include>
+        ) AS un_Count
+        from (
+          SELECT SUM (RECEIVE_COUNT) RECEIVE_COUNT,                 /*接待客户数总数*/
+                         SUM (TOTAL) TOTAL,                                 /*已抽号总数*/
+                         SUM (CUSTOMER_ID_COUNT) CUSTOMER_ID_COUNT,         /*已身份识别总数*/
+                         <include refid="evaluate_rate_count"></include>,
+            COUNT (1) STATUSCOUNT,                             /*服务质量等级总数量*/
+            COUNT (CASE QUALITY_STATUS WHEN '2' THEN 1 ELSE NULL END)
+            MIDDLE_COUNT,                                    /*等级中数*/
+            COUNT (CASE QUALITY_STATUS WHEN '3' THEN 1 ELSE NULL END)
+            NICE_COUNT,                                      /*等级良数*/
+            COUNT (CASE QUALITY_STATUS WHEN '4' THEN 1 ELSE NULL END)
+            GOOD_COUNT                                       /*等级优数*/
+                    FROM MAS_QUEUE_BRANCH_Q
+                    where branch_no
+                    <include refid="simple_where_chose"></include>
+                ) a
+        )
+    </select>
+
+    <resultMap id="quality_list_info_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.QualityListInfo">
+            <result property="evaluateRate" column="evaluateRate"></result>
+            <result property="evaluateGoodRate" column="evaluateGoodRate"></result>
+            <result property="evaluateMidRate" column="evaluateMidRate"></result>
+            <result property="evaluateBadRate" column="evaluateBadRate"></result>
+            <result property="customerRate" column="customerRate"></result>
+            <result property="evaluateBadCount" column="evaluateBadCount"></result>
+            <result property="branchName" column="branchName"></result>
+            <result property="qualityLevel" column="qualityLevel"></result>
+            <result property="branchNo" column="branch_no"></result>
+    </resultMap>
+    <select id="querySimpleQualityListInfo" parameterType="java.lang.String"
+            resultMap="quality_list_info_map">
+       with temp as (
+        <include refid="with_simple_sql"></include>
+        <choose>
+            <when test="queryType ==1 or queryType ==6">
+            and QUALITY_STATUS= 1
+        </when>
+            <when test="queryType ==5 ">
+            </when>
+            <otherwise>
+                and QUALITY_STATUS=#{queryType}
+            </otherwise>
+        </choose>
+        )
+        SELECT * FROM(
+            SELECT
+            *
+            FROM
+            (SELECT * from temp
+            where customerrate is not null
+            <if test="orderColumn != null and orderColumn != ''">
+                order by ${orderColumn}
+            </if>
+            )
+            UNION all
+            SELECT
+            *
+            FROM
+            temp  where customerrate is null
+        )
+        <if test="queryType==1">
+            where customerRate is not null
+        </if>
+        <if test="queryType==6">
+            where customerRate is null
+        </if>
+    </select>
+
+
+    <select id="queryQualityListTopInfo" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QualityListInfo">
+        select * from (
+        <include refid="simple_select"></include>
+        order by rownum
+        <if test="order == 'DESC'">
+            DESC
+        </if>
+        <if test="order == 'ASC'">
+            ASC
+        </if>
+        ) where rownum &lt;= #{rowNum}
+    </select>
+
+    <select id="getBranchQualitySum" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QualityBranchSum">
+        select
+       		CASE EVALUATE_COUNT
+       		WHEN 0 THEN null
+       		ELSE ROUND (EVALUATE_BAD_COUNT / EVALUATE_COUNT,4) * 100
+       		END negativeRate,
+       		CASE EVALUATE_COUNT
+       		WHEN 0 THEN null
+       		ELSE ROUND (EVALUATE_MID_COUNT / EVALUATE_COUNT,4) * 100
+       		END evaluateMidRate,
+       		CASE EVALUATE_INVITE_COUNT
+       		WHEN 0 THEN null
+			ELSE ROUND (EVALUATE_COUNT / EVALUATE_INVITE_COUNT,4)*100
+			END evaluateRate,
+			CASE EVALUATE_COUNT
+       		WHEN 0 THEN null
+			ELSE ROUND (EVALUATE_GOOD_COUNT /EVALUATE_COUNT,4)*100
+			END positiveRate,
+			CASE TOTAL
+       		WHEN 0 THEN null
+			ELSE ROUND (CUSTOMER_ID_COUNT / TOTAL,4)*100
+			END customerRate,
+			EVALUATE_BAD_COUNT negativeCount
+		 from MAS_QUEUE_BRANCH_Q A,TL9_ORGBASIC B
+			where A.BRANCH_NO = B.ORGID and A.BRANCH_NO = #{branchNo}
+    </select>
+    <select id="getBranchQualityUser" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QualityBranchUser">
+        SELECT
+        d.user_no AS userId,
+        d.GENDER as gender,
+        f.user_status as userStatus,
+        d.user_name as userName,
+        evaluate_rate as evaluateRate,
+        evaluate_rank as evaluateBank,
+        positive_rate as positiveRate,
+        positive_rank as positiveBank,
+        evaluateMid_rate as evaluateMidRate,
+        evaluateMid_rank as evaluateMidBank,
+        negative_rate as negativeRate,
+        negative_rank as negativeBank,
+        case when badevaluateflagcount is null then 0 else badevaluateflagcount end negativeCount
+        FROM
+        tl9_qu_user_basic d
+        left join TL9_QU_USER_STATUS f
+        on d.user_no = f.user_no
+        LEFT JOIN
+        (
+        SELECT
+        ROWNUM evaluate_rank,
+        user_id,
+        branch_no,
+        evaluate_rate
+        FROM
+        (
+        SELECT
+        tqb.user_no user_id,
+        tqb.branch_no,
+        CASE
+        WHEN evaluateflagcount =0
+        THEN null
+        when evaluatecount =0
+        then 0
+        else
+        ROUND (evaluatecount / evaluateflagcount, 3 ) * 100
+        END evaluate_rate
+        FROM tl9_qu_user_basic tqb
+        left join
+        (
+        SELECT
+        user_id,
+        c.branch_no branch_no,
+        COUNT (
+        CASE evaluate_flag
+        WHEN '1'
+        THEN 1
+        ELSE NULL
+        END ) evaluateflagcount,
+        COUNT (
+        CASE
+        WHEN evaluate IS NULL
+        THEN NULL
+        ELSE 1
+        END ) evaluatecount
+        FROM
+        MAS_QUEUE_BUSI_INFO c
+        WHERE
+        queue_status = '2'
+        AND valid_flag IS NULL
+        AND BRANCH_NO = #{branchNo}
+        GROUP BY
+        user_id,
+        branch_no) e
+        ON tqb.user_no = e.user_id
+        WHERE
+        tqb.branch_no = #{branchNo}
+        and tqb.user_level is null
+        ORDER BY
+        evaluate_rate DESC nulls last)) b
+        ON
+        (
+        b.user_id = d.user_no
+        AND d.branch_no = b.branch_no)
+        LEFT JOIN
+        (
+        SELECT
+        ROWNUM positive_rank,
+        user_id,
+        branch_no,
+        positive_rate
+        FROM
+        (
+        SELECT
+        tqb.user_no user_id,
+        tqb.branch_no,
+        CASE
+        WHEN evaluatecount =0
+        THEN null
+        when goodevaluateflagcount =0
+        then 0
+        else
+        ROUND (goodevaluateflagcount / evaluatecount, 3 ) * 100
+        END positive_rate
+        FROM tl9_qu_user_basic tqb
+        left join
+        (
+        SELECT
+        user_id,
+        c.branch_no branch_no,
+        COUNT (
+        CASE
+        WHEN evaluate IS NULL
+        THEN NULL
+        ELSE 1
+        END ) evaluatecount,
+        COUNT (
+        CASE evaluate
+        WHEN '1'
+        THEN 1
+        ELSE NULL
+        END ) goodevaluateflagcount
+        FROM
+        MAS_QUEUE_BUSI_INFO c
+        WHERE
+        queue_status = '2'
+        AND valid_flag IS NULL
+        AND BRANCH_NO = #{branchNo}
+        GROUP BY
+        user_id,
+        branch_no) f
+        ON tqb.user_no = f.user_id
+        WHERE
+        tqb.branch_no = #{branchNo}
+        and tqb.user_level is null
+        ORDER BY
+        positive_rate DESC nulls last)) c
+        ON
+        (
+        c.user_id = d.user_no
+        AND d.branch_no = c.branch_no)
+        LEFT JOIN
+        (
+        SELECT
+        ROWNUM evaluateMid_rank,
+        user_id,
+        branch_no,
+        evaluateMid_rate
+        FROM
+        (
+        SELECT
+        tqb.user_no user_id,
+        tqb.branch_no,
+        CASE
+        WHEN evaluatecount =0
+        THEN null
+        when midevaluateflagcount =0
+        then 0
+        else
+        ROUND (midevaluateflagcount / evaluatecount, 3 ) * 100
+        END evaluateMid_rate
+        FROM tl9_qu_user_basic tqb
+        left join
+        (
+        SELECT
+        user_id,
+        c.branch_no branch_no,
+        COUNT (
+        CASE
+        WHEN evaluate IS NULL
+        THEN NULL
+        ELSE 1
+        END ) evaluatecount,
+        COUNT (
+        CASE evaluate
+        WHEN '2'
+        THEN 1
+        ELSE NULL
+        END ) midevaluateflagcount
+        FROM
+        MAS_QUEUE_BUSI_INFO c
+        WHERE
+        queue_status = '2'
+        AND valid_flag IS NULL
+        AND BRANCH_NO = #{branchNo}
+        GROUP BY
+        user_id,
+        branch_no) f
+        ON tqb.user_no = f.user_id
+        WHERE
+        tqb.branch_no = #{branchNo}
+        and tqb.user_level is null
+        ORDER BY
+        evaluateMid_rate DESC nulls last)) g
+        ON
+        (
+        g.user_id = d.user_no
+        AND d.branch_no = g.branch_no)
+        LEFT JOIN
+        (
+        SELECT
+        ROWNUM negative_rank,
+        user_id,
+        branch_no,
+        negative_rate,
+        badevaluateflagcount
+        FROM
+        (
+        SELECT
+        tqb.user_no user_id,
+        tqb.branch_no,
+        CASE
+        WHEN evaluatecount =0
+        THEN null
+        when badevaluateflagcount =0
+        then 0
+        else
+        ROUND (badevaluateflagcount / evaluatecount, 3 ) * 100
+        END negative_rate,
+        badevaluateflagcount
+        FROM tl9_qu_user_basic tqb
+        left join
+        (
+        SELECT
+        user_id,
+        c.branch_no branch_no,
+        COUNT (
+        CASE
+        WHEN evaluate IS NULL
+        THEN NULL
+        ELSE 1
+        END ) evaluatecount,
+        COUNT (
+        CASE evaluate
+        WHEN '3'
+        THEN 1
+        ELSE NULL
+        END ) badevaluateflagcount
+        FROM
+        MAS_QUEUE_BUSI_INFO c
+        WHERE
+        queue_status = '2'
+        AND valid_flag IS NULL
+        AND BRANCH_NO = #{branchNo}
+        GROUP BY
+        user_id,
+        branch_no) f
+        ON tqb.user_no = f.user_id
+        WHERE
+        tqb.branch_no = #{branchNo}
+        and tqb.user_level is null
+        ORDER BY
+        negative_rate asc nulls last)) e
+        ON
+        (
+        e.user_id = d.user_no
+        AND d.branch_no = e.branch_no)
+        WHERE
+        d.branch_no = #{branchNo}
+        and d.user_level is null
+        ORDER BY
+        <if test="queryType =='eva'">
+            evaluateBank
+        </if>
+        <if test="queryType =='good'">
+            positiveBank
+        </if>
+        <if test="queryType =='mid'">
+            evaluateMidBank
+        </if>
+        <if test="queryType =='bad'">
+            negativeBank
+        </if>
+    </select>
+
+
+    <select id="getNegativeCustomerInfo"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.NegativeCustomerInfo"
+            parameterType="java.lang.String">
+        SELECT
+            (m.FINISH_TIME/ (24 * 60 * 60) + TO_DATE ('1970-01-01 00:00:00', 'yyyy-mm-dd hh24:mi:ss'))
+            as "time",
+            t.customer_name as "customerName",
+            t.MOBILE_PHONE as "phone"
+            from MAS_QUEUE_BUSI_INFO m
+            left join TL9_SM_CUSTOMER_BASIC t
+            on m.CUSTOMER_ID = t.CUSTOMER_ID
+        where
+            m.evaluate_flag = '1' AND
+            m.evaluate = '3' AND
+            m.queue_status = '2' AND
+            m.valid_flag IS NULL AND
+            m.user_id = #{userId}
+        order by "time" desc
+    </select>
+
+    <select id="getSumQualityInfo" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QualitySumBranchInfo">
+        SELECT
+            <include refid="branch_quality_rate_select"></include>,
+               EVALUATE_COUNT as "evaluateCount",
+               EVALUATE_INVITE_COUNT  as "inviteCount",
+               EVALUATE_GOOD_COUNT as "evaluateGoodCount"
+        FROM ( SELECT
+            <include refid="evaluate_rate_count"></include>
+        FROM MAS_QUEUE_BRANCH_Q
+        where branch_no
+        <include refid="simple_where_chose"></include>
+        )
+    </select>
+
+    <select id="getQualityLevelInfo" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QualitySumLevelInfo">
+        SELECT
+        STATUSCOUNT as "total",
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (BAD_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusBadRate", 			/*  网点 差占比  */
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (MIDDLE_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusMiddleRate",		/*  网点 中占比  */
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (NICE_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusNiceRate",			/*  网点 良占比  */
+        CASE STATUSCOUNT
+        WHEN 0 THEN NULL
+        ELSE ROUND (GOOD_COUNT / STATUSCOUNT, 4) * 100
+        END
+        as "statusGoodRate",			/*  网点 优占比  */
+        CASE
+        STATUSCOUNT
+        WHEN 0 THEN
+        NULL ELSE ROUND( un_Count / STATUSCOUNT, 4 ) * 100
+        END AS "statusUnDealRate",
+        BAD_COUNT as "statusBadCount",
+        MIDDLE_COUNT as "statusMiddleCount",
+        NICE_COUNT as "statusNiceCount",
+        GOOD_COUNT as "statusGoodCount",
+        un_Count  as "statusUnDealCount"
+	  FROM (   select a.*,
+        ( SELECT count( 1 ) FROM MAS_QUEUE_BRANCH_Q WHERE QUALITY_STATUS = 1 AND TOTAL != 0
+        and branch_no
+        <include refid="simple_where_chose"></include>
+        ) AS BAD_COUNT ,
+        ( SELECT count( 1 ) FROM MAS_QUEUE_BRANCH_Q WHERE QUALITY_STATUS = 1 AND TOTAL = 0
+        and branch_no
+        <include refid="simple_where_chose"></include>
+        ) AS un_Count
+        from (
+        SELECT SUM (RECEIVE_COUNT) RECEIVE_COUNT, /*接待客户数总数*/
+        SUM (TOTAL) TOTAL, /*已抽号总数*/
+        SUM (CUSTOMER_ID_COUNT) CUSTOMER_ID_COUNT, /*已身份识别总数*/
+        <include refid="evaluate_rate_count"></include>,
+        COUNT (1) STATUSCOUNT, /*服务质量等级总数量*/
+        COUNT (CASE QUALITY_STATUS WHEN '2' THEN 1 ELSE NULL END)
+        MIDDLE_COUNT, /*等级中数*/
+        COUNT (CASE QUALITY_STATUS WHEN '3' THEN 1 ELSE NULL END)
+        NICE_COUNT, /*等级良数*/
+        COUNT (CASE QUALITY_STATUS WHEN '4' THEN 1 ELSE NULL END)
+        GOOD_COUNT /*等级优数*/
+        FROM MAS_QUEUE_BRANCH_Q
+        where branch_no
+        <include refid="simple_where_chose"></include>
+            )a
+        )
+    </select>
+
+</mapper>

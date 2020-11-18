@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.MonitorTransDao">
+    <resultMap id="tran_detail_column" type="com.dcfs.smartaibank.manager.monitor.web.domian.TransDetail">
+        <result property="tranStatus" column="tran_status"></result>
+        <result property="tranStatusDesc" column="status_name"></result>
+        <result property="tranReturnCode" column="tran_ret_code"></result>
+        <result property="tranReturnMsg" column="tran_ret_desc"></result>
+        <result property="tranData" column="tran_date"></result>
+        <result property="tranType" column="tran_type"></result>
+        <result property="tranTypeDesc" column="tran_type_name"></result>
+        <result property="tranSequence" column="SEQ_NO"></result>
+        <result property="deviceId" column="mid"></result>
+        <result property="tranCode" column="tran_code"></result>
+        <result property="deviceClassKey" column="mclasskey"></result>
+        <result property="deviceClassName" column="mclassname"></result>
+        <result property="branchId" column="branch_no"></result>
+        <result property="branchName" column="branch_name"></result>
+        <result property="fieldNo" column="field_no"></result>
+        <result property="fieldName" column="field_name"></result>
+    </resultMap>
+    <!-- 交易处理汇总信息，各种状态的数量及占比字段 -->
+    <sql id="status_gather_final_column">
+       c.totalCount,
+       c.successCount,
+       c.exceptionCount,
+       c.failureCount,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.successCount / c.totalCount, 4) * 100
+       END
+          successRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.exceptionCount / c.totalCount, 4) * 100
+       END
+          exceptionRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.failureCount / c.totalCount, 4) * 100
+       END
+          failureRate
+    </sql>
+    <sql id="trans_org_tree_where">
+       t.branch_no IN
+            ( SELECT orgid
+            FROM tl9_orgbasic o
+            START WITH o.orgid = #{branchId,jdbcType=VARCHAR} AND o.orgstatustypeid != '0'
+            CONNECT BY o.BUSINESS_SUPERIOR = PRIOR o.orgid
+            AND o.orgstatustypeid != '0')
+    </sql>
+    <!-- 查询交易处理各种状态的数量 -->
+    <sql id="select_status_temp_count">
+        SELECT COUNT (1) AS totalCount,
+        COUNT (CASE WHEN T.STATUS = 3 THEN 1 ELSE NULL END)
+        AS successCount,
+        COUNT (CASE WHEN T.STATUS = 2 THEN 1 ELSE NULL END)
+        AS exceptionCount,
+        COUNT (CASE WHEN T.STATUS = 1 THEN 1 ELSE NULL END)
+        AS failureCount
+        FROM mas_tran_info t
+        INNER JOIN tl9_orgbasic o
+        ON t.branch_no = o.orgid
+        LEFT JOIN tl9_device_class c
+        ON t.mclasskey = c.devclasskey
+        LEFT JOIN mas_monitor_config m
+        ON t.tran_type = m.code_value
+        WHERE to_char(t.tran_date,'yyyymmdd') = #{tranDate}
+        <choose>
+            <when test="branchStatsType == 2">
+                AND
+                <include refid="trans_org_tree_where"></include>
+            </when>
+            <otherwise>
+                AND t.branch_no=#{branchId,jdbcType=VARCHAR}
+            </otherwise>
+        </choose>
+        and m.TYPE_NO='DICT'
+    </sql>
+    <!-- 查询交易处理汇总信息 -->
+    <select id="selectEachStatusCountGatherInfo"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TranStatusSum">
+        SELECT
+        <include refid="status_gather_final_column"></include>
+        FROM (
+        <include refid="select_status_temp_count"></include>
+        ) c
+    </select>
+    <!-- 查询ATM、STM、BSR交易笔数以及总笔数 -->
+    <select id="selectTransCount" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TranCount">
+        SELECT temp.totalCount,
+        temp.stmCount,
+        temp.atmCount,
+        temp.bsrCount,
+        CASE temp.totalCount
+        WHEN 0 THEN 0
+        ELSE ROUND (temp.stmCount / temp.totalCount, 4) * 100
+        END
+        stmRate,
+        CASE temp.totalCount
+        WHEN 0 THEN 0
+        ELSE ROUND (temp.atmCount / temp.totalCount, 4) * 100
+        END
+        atmRate,
+        CASE temp.totalCount
+        WHEN 0 THEN 0
+        ELSE ROUND (temp.bsrCount / temp.totalCount, 4) * 100
+        END
+        bsrRate
+        FROM (
+            SELECT COUNT (1) AS totalCount,
+            COUNT (CASE WHEN T.MCLASSKEY = '130000' THEN 1 ELSE NULL END)
+            AS stmCount,
+            COUNT (CASE WHEN T.MCLASSKEY = '120000' THEN 1 ELSE NULL END)
+            AS atmCount,
+            COUNT (CASE WHEN T.MCLASSKEY = '667' THEN 1 ELSE NULL END)
+            AS bsrCount
+            FROM mas_tran_info t
+            INNER JOIN tl9_orgbasic o
+            ON t.branch_no = o.orgid
+            LEFT JOIN tl9_device_class c
+            ON t.mclasskey = c.devclasskey
+            LEFT JOIN mas_monitor_config m
+            ON t.tran_type = m.code_value
+            WHERE to_char(t.tran_date,'yyyymmdd') = #{tranDate}
+            and m.TYPE_NO='DICT'
+            <choose>
+                <when test="branchStatsType == 2">
+                    AND
+                    <include refid="trans_org_tree_where"></include>
+                </when>
+                <otherwise>
+                    AND t.branch_no=#{branchId,jdbcType=VARCHAR}
+                </otherwise>
+            </choose>
+        ) temp
+    </select>
+    <!-- 查询监控交易处理详情列表 -->
+    <select id="selectTransDetail" resultMap="tran_detail_column">
+        SELECT temp.* from
+        (
+            SELECT t.tran_status,
+                CASE t.tran_status
+                WHEN 1 THEN '失败'
+                WHEN 2 THEN '异常'
+                WHEN 3 THEN '成功'
+                END
+                status_name,
+                t.tran_ret_code,
+                t.tran_ret_desc,
+                t.tran_date,
+                t.tran_type,
+                m.code_desc AS tran_type_name,
+                t.SEQ_NO,
+                t.mid,
+                t.tran_code,
+                t.mclasskey,
+                c.devclassname AS mclassname,
+                t.branch_no,
+                o.orgname_cn AS branch_name,
+                t.field_no,
+                t.field_name
+            FROM mas_tran_info t
+            INNER JOIN tl9_orgbasic o
+            ON t.branch_no = o.orgid
+            LEFT JOIN tl9_device_class c
+            ON t.mclasskey = c.devclasskey
+            LEFT JOIN mas_monitor_config m
+            ON t.tran_type = m.code_value
+            WHERE to_char(t.tran_date,'yyyymmdd') = #{tranDate}
+              and m.TYPE_NO='DICT'
+            <choose>
+                <when test="branchStatsType == 2">
+                    AND
+                    <include refid="trans_org_tree_where"></include>
+                </when>
+                <otherwise>
+                    AND t.branch_no=#{branchId,jdbcType=VARCHAR}
+                </otherwise>
+            </choose>
+            ORDER BY tran_date DESC
+        ) temp
+        where ROWNUM &lt;= #{queryNumber}
+    </select>
+
+    <select id="selectTimePhasedTransCount" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TimePhasedTransCount">
+        SELECT
+            to_char(d.dt,'hh24:mi') as startTime,
+            count(t.SEQ_NO) as transCount
+        FROM
+        (SELECT
+            TO_DATE(#{endDate},'yyyy-mm-dd hh24:mi:ss')-(level-1)/24/60*${interval} as dt
+            FROM dual
+            connect by level &lt;= #{showLength}) d
+            LEFT JOIN MAS_TRAN_INFO t
+            ON <include refid="trans_org_tree_where"></include>
+            AND t.TRAN_DATE &lt; d.dt
+                              AND t.TRAN_DATE >= d.dt-1/24/60*${interval}
+        group by d.dt
+        order by d.dt
+    </select>
+</mapper>

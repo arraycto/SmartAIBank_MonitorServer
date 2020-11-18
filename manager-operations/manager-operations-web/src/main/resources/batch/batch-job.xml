@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xsi:schemaLocation="http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
+        http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.3.xsd
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd">
+	<bean id="operationBatchTaskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<!-- 核心线程数 -->
+		<property name="corePoolSize" value="10"/>
+		<!-- 最大线程数 -->
+		<property name="maxPoolSize" value="15"/>
+		<!-- 队列最大长度 -->
+		<property name="queueCapacity" value="2000"/>
+		<!-- 线程池维护线程所允许的空闲时间 -->
+		<property name="keepAliveSeconds" value="100"/>
+		<property name="threadNamePrefix" value="batch-task"></property>
+		<!-- 线程池对拒绝任务(无线程可用)的处理策略 -->
+		<property name="rejectedExecutionHandler">
+			<bean class="java.util.concurrent.ThreadPoolExecutor$CallerRunsPolicy"/>
+		</property>
+	</bean>
+	<batch:job id="smartBatchJob" restartable="true">
+		<!--  第一阶段  数据导入阶段-->
+		<batch:split id="splitImportFirst" next="customerDataDealStep" task-executor="operationBatchTaskExecutor">
+			<!-- 客户信息导入flow -->
+			<batch:flow>
+				<!-- truncate删除客户信息 -->
+				<batch:step id="truncateTempCustomerInfo" next="customerInfoImportStep">
+					<batch:description>客户信息删除</batch:description>
+					<batch:tasklet ref="truncateTempCustomerInfoTasklet"/>
+				</batch:step>
+				<batch:split id="customerInfoImportStep" task-executor="operationBatchTaskExecutor">
+					<batch:flow>
+						<batch:step id="privateCustomerInfoImportStep" allow-start-if-complete="false">
+							<batch:description>对私客户信息导入</batch:description>
+							<batch:tasklet task-executor="operationBatchTaskExecutor" throttle-limit="5">
+								<batch:chunk reader="customerInfoImportReader" writer="customerInfoImportWriter"
+											 commit-interval="200" skip-limit="0x7fffffff">
+									<batch:skippable-exception-classes>
+										<batch:include class="java.lang.Exception"></batch:include>
+										<batch:exclude class="java.io.FileNotFoundException"></batch:exclude>
+									</batch:skippable-exception-classes>
+								</batch:chunk>
+							</batch:tasklet>
+						</batch:step>
+					</batch:flow>
+					<batch:flow>
+						<batch:step id="publicCustomerInfoImportStep" allow-start-if-complete="false">
+							<batch:description>对公客户信息导入</batch:description>
+							<batch:tasklet task-executor="operationBatchTaskExecutor" throttle-limit="5">
+								<batch:chunk reader="publicCustDataImportReader"
+											 writer="customerInfoImportWriter"
+											 commit-interval="200" skip-limit="0x7fffffff">
+									<batch:skippable-exception-classes>
+										<batch:include class="java.lang.Exception"></batch:include>
+										<batch:exclude class="java.io.FileNotFoundException"></batch:exclude>
+									</batch:skippable-exception-classes>
+								</batch:chunk>
+							</batch:tasklet>
+						</batch:step>
+					</batch:flow>
+				</batch:split>
+			</batch:flow>
+			<batch:flow>
+				<!-- truncate删除客户资产信息 -->
+				<batch:step id="truncateTempCustAssets" next="customerAssetsImportStep">
+					<batch:description>客户资产信息删除</batch:description>
+					<batch:tasklet ref="truncateTempCustAssetsTasklet"/>
+				</batch:step>
+				<batch:step id="customerAssetsImportStep" allow-start-if-complete="false">
+					<batch:description>客户资产数据导入</batch:description>
+					<batch:tasklet task-executor="operationBatchTaskExecutor" throttle-limit="5">
+						<batch:chunk reader="custAssetsDataImportReader" writer="customerAssetsImportWriter"
+									 commit-interval="200" skip-limit="0x7fffffff">
+							<batch:skippable-exception-classes>
+								<batch:include class="java.lang.Exception"></batch:include>
+								<batch:exclude class="java.io.FileNotFoundException"></batch:exclude>
+							</batch:skippable-exception-classes>
+						</batch:chunk>
+					</batch:tasklet>
+				</batch:step>
+			</batch:flow>
+			<!-- 柜面交易流水数据导入-->
+			<batch:flow>
+				<batch:step id="tradeDataDeleteStep" next="counterSysDataImportStep" allow-start-if-complete="false">
+					<batch:description>柜面交易流水删除</batch:description>
+					<batch:tasklet ref="deleteTradeDataReader"/>
+				</batch:step>
+				<batch:step id="counterSysDataImportStep" allow-start-if-complete="false">
+					<batch:description>柜面交易流水导入</batch:description>
+					<batch:tasklet task-executor="operationBatchTaskExecutor" throttle-limit="5">
+						<batch:chunk reader="counterDataImportReader" writer="counterDataImportWriter"
+									 commit-interval="200" skip-limit="0x7fffffff">
+							<batch:skippable-exception-classes>
+								<batch:include class="java.lang.Exception"></batch:include>
+								<batch:exclude class="java.io.FileNotFoundException"></batch:exclude>
+							</batch:skippable-exception-classes>
+						</batch:chunk>
+					</batch:tasklet>
+				</batch:step>
+			</batch:flow>
+		</batch:split>
+
+		<!--  第二阶段  数据整理阶段-->
+		<batch:step id="customerDataDealStep" next="counterDataDealStep" allow-start-if-complete="false">
+			<batch:description>客户信息整形</batch:description>
+			<batch:tasklet ref="custDataDealReader"/>
+		</batch:step>
+		<batch:step id="counterDataDealStep" next="queueSysDataDealStep" allow-start-if-complete="false">
+			<batch:description>柜面交易数据整形</batch:description>
+			<batch:tasklet ref="counterDataDealReader"/>
+		</batch:step>
+		<batch:step id="queueSysDataDealStep" next="hallDataDealStep" allow-start-if-complete="false">
+			<batch:description>排队数据抽取整形</batch:description>
+			<batch:tasklet ref="queueDataDealReader"/>
+		</batch:step>
+		<batch:step id="hallDataDealStep" next="custRoutesDataDealStep" allow-start-if-complete="false">
+			<batch:description>厅堂数据整形</batch:description>
+			<batch:tasklet ref="hallDataDealReader"/>
+		</batch:step>
+		<batch:step id="custRoutesDataDealStep" next="dayReportGeneratorStep" allow-start-if-complete="false">
+			<batch:description>客户动线数据抽整形</batch:description>
+			<batch:tasklet ref="custRoutesDataDealReader"/>
+		</batch:step>
+
+		<!-- 第三阶段：数据处理阶段 -->
+		<!-- 日报表数据处理 -->
+		<batch:split id="dayReportGeneratorStep" next="operationMonthDecision"
+					 task-executor="operationBatchTaskExecutor">
+			<batch:flow>
+				<batch:step id="queueByCustTypeDayStep" allow-start-if-complete="true">
+					<batch:description>排队情况统计按照客户类型统计-日统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByCustTypeOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelDayStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道统计-日统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelAndTradeDayStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道和交易统计-日统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelAndTradeOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketDayStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销统计-日统计</batch:description>
+					<batch:tasklet ref="hallDataStaticOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketUserDayStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销柜员数据统计-日统计</batch:description>
+					<batch:tasklet ref="hallDataUserStaticOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="custFlowDayStep" allow-start-if-complete="true">
+					<batch:description>客户流量统计按照年龄统计-日统计</batch:description>
+					<batch:tasklet ref="customerFlowStatisOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumDayStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计-日统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumByTradeDayStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计按照交易维度统计-日统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisByTradeOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="oraganizationSumDayStep" allow-start-if-complete="true">
+					<batch:description>机构汇总统计-日统计</batch:description>
+					<batch:tasklet ref="organizationSumStatisOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="queueByTimeTypeDayStep" allow-start-if-complete="true">
+					<batch:description>排队情况按照时间类型统计-日统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByTimeTypeOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="customerRoutesDayStep" allow-start-if-complete="true">
+					<batch:description>客户动线统计-日统计</batch:description>
+					<batch:tasklet ref="custRoutesOfDayReader"/>
+				</batch:step>
+			</batch:flow>
+		</batch:split>
+		<!-- 月报表是否执行判断 -->
+		<batch:decision id="operationMonthDecision" decider="operationMonthDecision">
+			<batch:next on="COMPLETED" to="monthReportGeneratorStep"></batch:next>
+			<batch:end on="FAILED"></batch:end>
+		</batch:decision>
+		<!-- 月报表数据处理 -->
+		<batch:split id="monthReportGeneratorStep" next="operationQuarterDecision"
+					 task-executor="operationBatchTaskExecutor">
+			<batch:flow>
+				<batch:step id="queueByCustTypeMonthStep" allow-start-if-complete="true">
+					<batch:description>排队情况统计按照客户类型统计-月统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByCustTypeOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelMonthStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道统计-月统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelAndTradeMonthStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道和交易统计-月统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelAndTradeOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketMonthStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销统计-月统计</batch:description>
+					<batch:tasklet ref="hallDataStaticOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketUserMonthStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销柜员数据统计-月统计</batch:description>
+					<batch:tasklet ref="hallDataUserStaticOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="custFlowMonthStep" allow-start-if-complete="true">
+					<batch:description>客户流量统计按照年龄统计-月统计</batch:description>
+					<batch:tasklet ref="customerFlowStatisOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumMonthStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计-月统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumByTradeMonthStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计按照交易维度统计-月统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisByTradeOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="oraganizationSumMonthStep" allow-start-if-complete="true">
+					<batch:description>机构汇总统计-月统计</batch:description>
+					<batch:tasklet ref="organizationSumStatisOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="queueByTimeTypeMonthStep" allow-start-if-complete="true">
+					<batch:description>排队情况按照时间类型统计-月统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByTimeTypeOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="customerRoutesMonthStep" allow-start-if-complete="true">
+					<batch:description>客户动线统计-月统计</batch:description>
+					<batch:tasklet ref="custRoutesOfMonthReader"/>
+				</batch:step>
+			</batch:flow>
+		</batch:split>
+		<!-- 季报表是否执行判断 -->
+		<batch:decision id="operationQuarterDecision" decider="operationQuarterDecision">
+			<batch:next on="COMPLETED" to="quarterReportGeneratorStep"></batch:next>
+			<batch:end on="FAILED"></batch:end>
+		</batch:decision>
+		<!-- 季报表数据处理 -->
+		<batch:split id="quarterReportGeneratorStep" next="operationYearDecision"
+					 task-executor="operationBatchTaskExecutor">
+			<batch:flow>
+				<batch:step id="queueByCustTypeQuarterStep" allow-start-if-complete="true">
+					<batch:description>排队情况统计按照客户类型统计-季统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByCustTypeOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelQuarterStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道统计-季统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelAndTradeQuarterStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道和交易统计-季统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelAndTradeOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketQuarterStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销统计-季统计</batch:description>
+					<batch:tasklet ref="hallDataStaticOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketUserQuarterStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销柜员数据统计-季统计</batch:description>
+					<batch:tasklet ref="hallDataUserStaticOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="custFlowQuarterStep" allow-start-if-complete="true">
+					<batch:description>客户流量统计按照年龄统计-季统计</batch:description>
+					<batch:tasklet ref="customerFlowStatisOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumQuarterStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计-季统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumByTradeQuarterStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计按照交易维度统计-季统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisByTradeOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="oraganizationSumQuarterStep" allow-start-if-complete="true">
+					<batch:description>机构汇总统计-季统计</batch:description>
+					<batch:tasklet ref="organizationSumStatisOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="queueByTimeTypeQuarterStep" allow-start-if-complete="true">
+					<batch:description>排队情况按照时间类型统计-季统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByTimeTypeOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="customerRoutesQuarterStep" allow-start-if-complete="true">
+					<batch:description>客户动线统计-季统计</batch:description>
+					<batch:tasklet ref="custRoutesOfQuarterReader"/>
+				</batch:step>
+			</batch:flow>
+		</batch:split>
+		<!-- 年报表是否执行判断 -->
+		<batch:decision id="operationYearDecision" decider="operationYearDecision">
+			<batch:next on="COMPLETED" to="yearReportGeneratorStep"></batch:next>
+			<batch:end on="FAILED"></batch:end>
+		</batch:decision>
+		<!-- 年报表数据处理 -->
+		<batch:split id="yearReportGeneratorStep" task-executor="operationBatchTaskExecutor">
+			<batch:flow>
+				<batch:step id="queueByCustTypeYearStep" allow-start-if-complete="true">
+					<batch:description>排队情况统计按照客户类型统计-年统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByCustTypeOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelYearStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道统计-年统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="busiEfficienByChannelAndTradeYearStep" allow-start-if-complete="true">
+					<batch:description>业务效率统计按照渠道和交易统计-年统计</batch:description>
+					<batch:tasklet ref="busEfficStatisByChannelAndTradeOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketYearStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销统计-年统计</batch:description>
+					<batch:tasklet ref="hallDataStaticOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="hallMarketUserYearStep" allow-start-if-complete="true">
+					<batch:description>厅堂营销柜员数据统计-年统计</batch:description>
+					<batch:tasklet ref="hallDataUserStaticOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="custFlowYearStep" allow-start-if-complete="true">
+					<batch:description>客户流量统计按照年龄统计-年统计</batch:description>
+					<batch:tasklet ref="customerFlowStatisOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumYearStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计-年统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="employeeSumByTradeYearStep" allow-start-if-complete="true">
+					<batch:description>柜员汇总统计按照交易维度统计-年统计</batch:description>
+					<batch:tasklet ref="employeesSumStatisByTradeOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="oraganizationSumYearStep" allow-start-if-complete="true">
+					<batch:description>机构汇总统计-年统计</batch:description>
+					<batch:tasklet ref="organizationSumStatisOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="queueByTimeTypeYearStep" allow-start-if-complete="true">
+					<batch:description>排队情况按照时间类型统计-年统计</batch:description>
+					<batch:tasklet ref="queueDataStatisByTimeTypeOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+			<batch:flow>
+				<batch:step id="customerRoutesYearStep" allow-start-if-complete="true">
+					<batch:description>客户动线统计-年统计</batch:description>
+					<batch:tasklet ref="custRoutesOfYearReader"/>
+				</batch:step>
+			</batch:flow>
+		</batch:split>
+	</batch:job>
+</beans>

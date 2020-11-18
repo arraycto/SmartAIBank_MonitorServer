@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.TranDao">
+	<insert id="insert" parameterType="java.util.HashMap">
+		INSERT INTO MAS_TRAN_INFO(
+			SEQ_NO,
+			TRAN_CODE,
+			TRAN_NAME,
+			TRAN_TYPE,
+			TRAN_DATE,
+			TRAN_AMT,
+			BRANCH_NO,
+			MID,
+			MCLASSKEY,
+			FIELD_NO,
+			FIELD_NAME,
+			TRAN_CARD_NO,
+			TRAN_CARD_TYPE,
+			TRAN_STATUS,
+			TRAN_RET_CODE,
+			TRAN_RET_DESC,
+			STATUS,
+			STATUS_DESC,
+			HANDLE_COUNTY,
+			HANDLE_CITY,
+			HANDLE_PROVINCE,
+			BRANCH_NAME
+		) VALUES (
+			#{SEQ_NO},
+			#{TRAN_CODE},
+			#{TRAN_NAME},
+			#{TRAN_TYPE,jdbcType=VARCHAR},
+			#{TRAN_DATE},
+			#{TRAN_AMT,jdbcType=NUMERIC},
+			#{BRANCH_NO},
+			#{MID},
+			#{MCLASSKEY},
+			#{FIELD_NO,jdbcType=VARCHAR},
+			#{FIELD_NAME,jdbcType=VARCHAR},
+			#{TRAN_CARD_NO,jdbcType=VARCHAR},
+			#{TRAN_CARD_TYPE,jdbcType=VARCHAR},
+			#{TRAN_STATUS},
+			#{TRAN_RET_CODE},
+			#{TRAN_RET_DESC},
+			#{TRAN_STATUS, jdbcType=DECIMAL},
+			#{TRAN_RET_DESC},
+			#{HANDLE_COUNTY, jdbcType=VARCHAR},
+			#{HANDLE_CITY, jdbcType=VARCHAR},
+			#{HANDLE_PROVINCE, jdbcType=VARCHAR},
+			#{BRANCH_NAME, jdbcType=VARCHAR}
+		)
+	</insert>
+	<update id="update" parameterType="java.util.HashMap">
+		UPDATE MAS_TRAN_INFO
+		<set>
+			<if test="TRAN_CODE != null">TRAN_CODE=#{TRAN_CODE}</if>
+			<if test="TRAN_NAME != null">,TRAN_NAME=#{TRAN_NAME}</if>
+			<if test="TRAN_TYPE != null">,TRAN_TYPE=#{TRAN_TYPE}</if>
+			<if test="TRAN_DATE != null">,TRAN_DATE=#{TRAN_DATE}</if>
+			<if test="TRAN_AMT != null">,TRAN_AMT=#{TRAN_AMT,jdbcType=NUMERIC}</if>
+			<if test="BRANCH_NO != null">,BRANCH_NO=#{BRANCH_NO}</if>
+			<if test="MID != null">,MID=#{MID}</if>
+			<if test="MCLASSKEY != null">,MCLASSKEY=#{MCLASSKEY}</if>
+			<if test="FIELD_NO != null">,FIELD_NO=#{FIELD_NO,jdbcType=VARCHAR}</if>
+			<if test="FIELD_NAME != null">,FIELD_NAME=#{FIELD_NAME,jdbcType=VARCHAR}</if>
+			<if test="TRAN_CARD_NO != null">,TRAN_CARD_NO=#{TRAN_CARD_NO,jdbcType=VARCHAR}</if>
+			<if test="TRAN_CARD_TYPE != null">,TRAN_CARD_TYPE=#{TRAN_CARD_TYPE,jdbcType=VARCHAR}</if>
+			<if test="TRAN_STATUS != null">,TRAN_STATUS=#{TRAN_STATUS}</if>
+			<if test="TRAN_RET_CODE != null">,TRAN_RET_CODE=#{TRAN_RET_CODE}</if>
+			<if test="TRAN_RET_DESC != null">,TRAN_RET_DESC=#{TRAN_RET_DESC}</if>
+			<if test="HANDLE_COUNTY != null">,HANDLE_COUNTY=#{HANDLE_COUNTY}</if>
+			<if test="HANDLE_CITY != null">,HANDLE_CITY=#{HANDLE_CITY}</if>
+			<if test="HANDLE_PROVINCE != null">,HANDLE_PROVINCE=#{HANDLE_PROVINCE}</if>
+			<if test="BRANCH_NAME != null">,BRANCH_NAME=#{BRANCH_NAME}</if>
+		</set>
+		WHERE SEQ_NO=#{SEQ_NO}
+	</update>
+	<insert id="insertAlarm" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="ID" order="BEFORE">
+			select
+			'T'||lpad(MAS_TRAN_ALARM_INFO_SEQ.nextval, 12, '0') as ID
+			From DUAL
+		</selectKey>
+		INSERT INTO MAS_TRAN_ALARM_INFO(
+			ID,
+			ALARM_LEVEL,
+			DESCRIPTION,
+			ALARM_STATUS,
+			ALARM_DATE,
+			MID,
+			MCLASSKEY,
+			BRANCH_NO,
+			FIELD_NO,
+			FIELD_NAME,
+			SEQ_NO,
+			RULE_ID,
+			MONITOR_ITEM_ID,
+			BRANCH_NAME,
+			MCLASSNAME,
+			TRAN_STATUS,
+			TRAN_TYPE,
+			TRAN_TYPE_NAME,
+			TRAN_AMT,
+			TRAN_CARD_NO,
+			TRAN_CARD_TYPE,
+			TRAN_CARD_TYPE_NAME
+		) VALUES (
+			#{ID},
+			#{ALARM_LEVEL},
+			#{ALARM_DESC},
+			#{ALARM_STATUS},
+			#{ALARM_DATE},
+			#{MID},
+			#{MCLASSKEY},
+			#{BRANCH_NO},
+			#{FIELD_NO,jdbcType=VARCHAR},
+			#{FIELD_NAME,jdbcType=VARCHAR},
+			#{SEQ_NO},
+			#{ALARM_RULE_ID},
+			#{MONITOR_ITEM_ID},
+			#{BRANCH_NAME,jdbcType=VARCHAR},
+			#{MCLASSNAME,jdbcType=VARCHAR},
+			#{TRAN_STATUS},
+			#{TRAN_TYPE,jdbcType=VARCHAR},
+			#{TRAN_TYPE_NAME,jdbcType=VARCHAR},
+			#{TRAN_AMT,jdbcType=NUMERIC},
+			#{TRAN_CARD_NO},
+			#{TRAN_CARD_TYPE,jdbcType=VARCHAR},
+			#{TRAN_CARD_TYPE_NAME,jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<insert id="insertSum" parameterType="java.util.HashMap">
+		INSERT INTO MAS_TRAN_INFO_SUM(MCLASSKEY,TRAN_TYPE,TRAN_STATUS,TRAN_DATE_STR,TRAN_COUNT)
+		VALUES(#{MCLASSKEY},#{TRAN_TYPE},#{TRAN_STATUS},#{TRAN_DATE_STR},1)
+	</insert>
+	<update id="updateSum" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_TRAN_INFO_SUM
+		SET TRAN_COUNT = TRAN_COUNT+1
+		WHERE
+			MCLASSKEY=#{MCLASSKEY}
+			AND TRAN_TYPE=#{TRAN_TYPE}
+			AND TRAN_STATUS=#{TRAN_STATUS}
+			AND TRAN_DATE_STR=#{TRAN_DATE_STR}
+	</update>
+
+</mapper>

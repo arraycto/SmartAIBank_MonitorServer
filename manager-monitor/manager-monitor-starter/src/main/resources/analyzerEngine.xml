@@ -1,0 +1,177 @@
+<?xml version="1.0"?>
+<!DOCTYPE Configure PUBLIC "-//Dcfs//Configure//EN" "configure.dtd">
+<Configure id="AnalyzerEngine" class="com.dcfs.smartaibank.manager.monitor.analyzer.engine.AnalyzerEngineImpl">
+	<!-- 初始化分析引擎的线程池，参数为配置文件参数 -->
+	<Call name="initThreadPool">
+		<Arg type="int">
+			<AppProperty name="monitor.engine.pool.core-size" />
+		</Arg>
+		<Arg type="int">
+			<AppProperty name="monitor.engine.pool.max-size" />
+		</Arg>
+		<Arg type="long">
+			<AppProperty name="monitor.engine.pool.keep-alive" />
+		</Arg>
+		<Arg type="int">
+			<AppProperty name="monitor.engine.pool.queue-size" />
+		</Arg>
+	</Call>
+	<Set name="ruleCenter">
+		<Bean id="ruleCenter" name="ruleCenter" />
+	</Set>
+
+	<Bean id="executorManager" name="executorManager"/>
+	<Bean id="serviceManager" name="serviceManager" />
+	<Bean id="notifyManager" name="notifyManager" />
+	<Bean id="tranService" name="tranService" />
+	<Bean id="commonService" name="commonService"/>
+	<!--  设置过滤和预处理器，针对一条监控数据该处理器只执行一次 -->
+	<Set name="filterAndPrepareHandler">
+		<New class="com.dcfs.smartaibank.handler.HandlerList">
+			<Set name="handlers">
+				<Array type="com.dcfs.smartaibank.handler.Handler">
+					<!-- 过滤器集合 -->
+					<Item>
+             			<New class="com.dcfs.smartaibank.handler.HandlerSet">
+             				<Set name="handlers">
+             					<Array type="com.dcfs.smartaibank.handler.Handler">
+             						<!--  默认过滤器 -->
+             						<Item>
+				             			<New class="com.dcfs.smartaibank.manager.monitor.analyzer.filter.MvelFilterHandler">
+				             				<Set name="executorManager">
+				             					<Ref refid="executorManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+             					</Array>
+             				</Set>
+             			</New>
+           			</Item>
+					<!-- 预处理器集合 -->
+					<Item>
+             			<New class="com.dcfs.smartaibank.handler.HandlerCollection">
+             				<Set name="handlers">
+             					<Array type="com.dcfs.smartaibank.handler.Handler">
+             						<!-- 默认预处理器 -->
+             						<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.prepare.DefaultPrepareHandler">
+				             				<Set name="executorManager">
+				             					<Ref refid="executorManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+				           			<!-- 外设监控增加状态字段 -->
+             						<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.prepare.AddWosaDeviceParamHandler">
+				             				<Set name="ruleCenter">
+				             					<Ref refid="ruleCenter"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+				           			<!-- 交易监控增加状态字段 -->
+             						<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.prepare.AddTranParamPrepareHandler">
+				             				<Set name="ruleCenter">
+				             					<Ref refid="ruleCenter"/>
+				             				</Set>
+				             				<Set name="commonService">
+				             					<Ref refid="commonService"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+				           			<!-- 设备激活标志 -->
+             						<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.prepare.MachineActivePrepareHandler">
+				             				<Set name="ruleCenter">
+				             					<Ref refid="ruleCenter"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+									<!-- 日志处理标志 -->
+             						<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.prepare.AddLogParamHandler">
+				             				<Set name="ruleCenter">
+				             					<Ref refid="ruleCenter"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+             					</Array>
+             				</Set>
+             			</New>
+           			</Item>
+				</Array>
+			</Set>
+		</New>
+	</Set>
+	<!--  设置分析和处理器 -->
+	<Set name="handler">
+		<New class="com.dcfs.smartaibank.handler.HandlerList">
+			<Set name="handlers">
+				<Array type="com.dcfs.smartaibank.handler.Handler">
+					<!-- 分析器集合 -->
+					<Item>
+             			<New class="com.dcfs.smartaibank.handler.HandlerCollection">
+             				<Set name="handlers">
+             					<Array type="com.dcfs.smartaibank.handler.Handler">
+             						<!--  默认分析器 -->
+             						<Item>
+				             			<New class="com.dcfs.smartaibank.manager.monitor.analyzer.analyzer.DefaultAnalyzerHandler">
+				             				<Set name="executorManager">
+				             					<Ref refid="executorManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+             					</Array>
+             				</Set>
+             			</New>
+           			</Item>
+					<!-- 处理器集合 -->
+					<Item>
+             			<New class="com.dcfs.smartaibank.handler.HandlerCollection">
+             				<Set name="handlers">
+             					<Array type="com.dcfs.smartaibank.handler.Handler">
+             						<!-- 默认预警处理器 -->
+             						<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.process.DefaultAlarmProcessHandler">
+				             				<Set name="executorManager">
+				             					<Ref refid="executorManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+				           			<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.process.MonitorSaveProcessHandler">
+				             				<Set name="serviceManager">
+				             					<Ref refid="serviceManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+				           			<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.process.AlarmSaveProcessHandler">
+				             				<Set name="serviceManager">
+				             					<Ref refid="serviceManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+									<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.process.NotifyProcessHandler">
+				             				<Set name="notifyManager">
+				             					<Ref refid="notifyManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+				           			<Item>
+										<New class="com.dcfs.smartaibank.manager.monitor.analyzer.process.FaultRecordSaveProcessHandler">
+				             				<Set name="serviceManager">
+				             					<Ref refid="serviceManager"/>
+				             				</Set>
+				             			</New>
+				           			</Item>
+             					</Array>
+             				</Set>
+             			</New>
+           			</Item>
+				</Array>
+			</Set>
+		</New>
+	</Set>
+</Configure>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.OrgTreeDao">
+    <select id="getOrgTree" parameterType="java.lang.String" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.OrgInfo">
+      SELECT
+	o.ORGID AS orgId,
+	o.ORGNAME_CN AS orgNameCn,
+	o.BUSINESS_SUPERIOR AS businessSuperior,
+	o.ORGLEVELID AS orgLevelId,
+	o.ADDRESS AS address,
+	o.ORGTYPEID AS orgTypeId
+    FROM
+        TL9_ORGBASIC o
+    START WITH
+        ORGID = #{orgId}
+    CONNECT BY
+        PRIOR ORGID = BUSINESS_SUPERIOR
+    </select>
+</mapper>

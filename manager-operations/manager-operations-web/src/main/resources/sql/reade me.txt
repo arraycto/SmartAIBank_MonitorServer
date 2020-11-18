@@ -1,0 +1,4 @@
+文件说明：
+运行spring-batch批处理任务，需要先对数据库做初始化配置，其中
+sql/schema-mysql.sql文件是数据源采用mysql时脚本。
+sql/schema-oracle.sql文件是数据源采用oracle时的脚本。

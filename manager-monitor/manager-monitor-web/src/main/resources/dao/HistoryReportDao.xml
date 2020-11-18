@@ -1,0 +1,1382 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.HistoryReportDao">
+
+    <resultMap id="base_result_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryReportInfo">
+        <result property="toolClassName" column="MCLASSNAME"/>
+        <result property="toolModelName" column="MMODELNAME"/>
+        <result property="manufName" column="MANUF_NAME"/>
+        <result property="faultTime" column="FAULT_TIME_INT"/>
+        <result property="normalTime" column="NORMAL_TIME_INT"/>
+        <result property="devFaultRate" column="RATE_NUM"/>
+        <result property="toolClassKey" column="MCLASSKEY"/>
+        <result property="devClassKey" column="DEVCLASSKEY"/>
+        <result property="manufId" column="MANUF_ID"/>
+    </resultMap>
+    <resultMap id="common_peripheral_details_column"
+               type="com.dcfs.smartaibank.manager.monitor.web.domian.PeripheralFaultRateGatherInfo">
+        <result property="devClassKey" column="MCLASSKEY"></result>
+        <result property="devClassName" column="MCLASSNAME"></result>
+        <result property="devModelKey" column="MMODELKEY"></result>
+        <result property="devModelName" column="MNAME"></result>
+        <result property="manufacturerId" column="MANUF_ID"></result>
+        <result property="manufacturerName" column="MANUF_NAME"></result>
+        <result property="startUpTime" column="SUM_NORMAL_TIME_INT"></result>
+        <collection property="peripheralFaultRates"
+                    ofType="com.dcfs.smartaibank.manager.monitor.web.domian.PeripheralFaultRate">
+            <result property="peripheralId" column="DEVCLASSKEY"></result>
+            <result property="peripheralName" column="DEVCLASSNAME"></result>
+            <result property="sumFaultTimeInt" column="SUM_FAULT_TIME_INT"></result>
+            <result property="faultTimeIntRate" column="FAULT_TIME_INT_RATE"></result>
+        </collection>
+    </resultMap>
+    <resultMap id="managers_faultHandlingSpeedInfo"
+               type="com.dcfs.smartaibank.manager.monitor.web.domian.ManagersFaultHandlingSpeedInfo">
+        <result property="userName" column="userName"></result>
+        <result property="branchId" column="branch_no"></result>
+        <result property="branchName" column="BRANCH_NAME"></result>
+        <result property="warningLevel" column="WARNING_LEVEL"></result>
+        <result property="responseTime" column="response_time_each"></result>
+        <result property="solveTime" column="solve_time_each"></result>
+        <result property="warningLevelDesc" column="warning_level_str"></result>
+    </resultMap>
+    <resultMap id="managers_faultHandlingSpeed_graphicInfo"
+               type="com.dcfs.smartaibank.manager.monitor.web.domian.ManagersFaultHandlingSpeedGraphicInfo">
+        <result property="warningLevel" column="WARNING_LEVEL"></result>
+        <result property="warningLevelDesc" column="warning_level_str"></result>
+        <collection property="singleManagerFaultHandlingSpeedList"
+                    ofType="com.dcfs.smartaibank.manager.monitor.web.domian.SingleManagerFaultHandlingSpeed">
+            <result property="userName" column="userName"></result>
+            <result property="responseTime" column="response_time_each"></result>
+            <result property="solveTime" column="solve_time_each"></result>
+        </collection>
+    </resultMap>
+    <resultMap id="equipment_supplies_column"
+               type="com.dcfs.smartaibank.manager.monitor.web.domian.EquipmentConsumablesInfo">
+        <result property="devClassId" column="mclasskey"></result>
+        <result property="devClassName" column="mclassname"></result>
+        <result property="manufacturerId" column="manuf_id"></result>
+        <result property="manufacturerName" column="manuf_name"></result>
+        <result property="useTime" column="total_time"></result>
+        <result property="numberOfReplacements" column="count"></result>
+        <result property="selfAvgUseTime" column="total_supply_each"></result>
+    </resultMap>
+    <resultMap id="equipment_supplies_graphicInfo"
+               type="com.dcfs.smartaibank.manager.monitor.web.domian.EquipmentConsumablesInfo">
+        <result property="devClassId" column="mclasskey"></result>
+        <result property="devClassName" column="mclassname"></result>
+        <result property="manufacturerId" column="manuf_id"></result>
+        <result property="manufacturerName" column="manuf_name"></result>
+        <result property="selfAvgUseTime" column="total_supply_each"></result>
+    </resultMap>
+    <resultMap id="base_trans_quality_map"
+               type="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryTransQualityInfo">
+        <result property="branchNo" column="branch_no"></result>
+        <result property="branchName" column="branch_name"></result>
+        <result property="typeId" column="biz_type"></result>
+        <result property="dealSuccessCount" column="success_biz_total_count"></result>
+        <result property="dealSuccessRate" column="success_biz_total_ratio"></result>
+        <result property="typeName" column="biz_type_str"></result>
+    </resultMap>
+
+    <sql id="history_report_table">
+        <if test="historyReportParams.reportType == 'day'">
+            MAS_R_DAY_INFO t
+        </if>
+        <if test="historyReportParams.reportType == 'month'">
+            MAS_R_MONTH_INFO t
+        </if>
+        <if test="historyReportParams.reportType == 'quarter'">
+            MAS_R_PERIOD_INFO t
+        </if>
+        <if test="historyReportParams.reportType == 'year'">
+            MAS_R_YEAR_INFO t
+        </if>
+    </sql>
+
+    <sql id="tran_quality_sql">
+        (
+        select
+        t.branch_no,
+        t.branch_name,
+        t.biz_type,
+        t.REPORT_TYPE, t.report_year, t.report_quarter, t.report_month,
+        sum(t.success_biz_count) as success_biz_total_count,
+        sum(t.fail_biz_count) as fail_biz_total_count,
+        case sum(t.success_biz_count + t.fail_biz_count)
+        when 0 then 0
+        else
+        round( sum(t.success_biz_count) * 100 / sum(t.success_biz_count + t.fail_biz_count), 2)
+        end as
+        success_biz_total_ratio,
+        case sum(t.success_biz_count + t.fail_biz_count)
+        when 0 then 0
+        else
+        round( sum(t.fail_biz_count) * 100 / sum(t.success_biz_count + t.fail_biz_count), 2)
+        end as fail_biz_total_ratio,
+        t.biz_name as biz_type_str
+        from v_dtq_report t
+        where 1 =1
+        <if test='reportType !=null and reportType =="day"'>
+            <![CDATA[
+			  	and t.report_type='D'
+			  	and t.report_date >= to_date(#{reportDateStart} ||'00:00:00' ,'yyyy-mm-dd hh24:mi:ss')
+			  	and t.report_date <= to_date(#{reportDateEnd}|| '23:59:59','yyyy-mm-dd hh24:mi:ss')
+			  ]]>
+        </if>
+        <if test=' reportType !=null and reportType =="month" '>
+            and t.report_type='M'
+            and t.report_year = #{reportYear}
+            and t.report_month = #{reportMonth}
+        </if>
+        <if test=' reportType !=null and reportType =="quarter" '>
+            and t.report_type='Q' and t.report_year = #{reportYear} and t.report_quarter = #{reportQuarter}
+        </if>
+        <if test=' reportType !=null and reportType =="year" '>
+            and t.report_type='Y' and t.report_year = #{reportYear}
+        </if>
+        <if test=" bizType !=null and bizType!=''">
+            and t.biz_type =#{bizType}
+        </if>
+        <if test=" bizType ==null or bizType==''">
+            and t.biz_type in (
+                select distinct
+                c.resourceid as "id"
+                from tl9_resourcebasic c
+                where 1 = 1
+                and c.systemid = #{classKey}
+                and c.resourceid in (
+                with a as (select * from mas_monitor_config where TYPE_NO='REPORTPARAM' and CODE_NO='TRAN_TYPE')
+                select regexp_substr(a.CODE_VALUE,'[^\]+',1,level) as func from a
+                connect by level &lt;=regexp_count(a.CODE_VALUE,'\\')+1
+             )
+            )
+        </if>
+        <if test=" branchNo !=null and branchNo !='' ">
+            and t.branch_no in
+            (select orgid from tl9_orgbasic where orgtypeid = '1'
+            start with orgid = #{branchNo} and orgstatustypeid != '0'
+            connect by prior orgid = BUSINESS_SUPERIOR and orgstatustypeid != '0')
+        </if>
+        group by t.branch_no,t.branch_name,t.biz_type, t.biz_name, t.REPORT_TYPE, t.report_year, t.report_quarter,
+        t.report_month
+        ) t2
+    </sql>
+
+    <sql id="history_report_condition">
+        <if test="historyReportParams.isManager == true">
+            t.branch_no = #{branchId}
+        </if>
+        <if test="historyReportParams.isManager == false">
+            t.branch_no in (select orgid from tl9_orgbasic
+            START WITH orgid = #{branchId} and orgstatustypeid != '0'
+            CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+        </if>
+        <if test="historyReportParams.devClassKey !=null and historyReportParams.devClassKey.length > 0">
+            and t.mclasskey in
+            <foreach item="item" index="index" collection="historyReportParams.devClassKey" open="(" separator=","
+                     close=")">
+                #{item}
+            </foreach>
+        </if>
+        <if test="historyReportParams.manufId !=null and historyReportParams.manufId.length > 0">
+            and t.MANUF_ID in
+            <foreach item="item" index="index" collection="historyReportParams.manufId" open="(" separator=","
+                     close=")">
+                #{item}
+            </foreach>
+        </if>
+        <if test="historyReportParams.reportType == 'day'">
+            and t.CREATE_TIME &lt;= to_date(#{historyReportParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+            and t.CREATE_TIME &gt;= to_date(#{historyReportParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+        </if>
+        <if test="historyReportParams.reportType == 'month'">
+            and t.R_MONTH=#{historyReportParams.month} and R_YEAR =#{historyReportParams.year}
+        </if>
+        <if test="historyReportParams.reportType == 'quarter'">
+            and t.R_PERIOD=#{historyReportParams.quarter} and R_YEAR =#{historyReportParams.year}
+        </if>
+        <if test="historyReportParams.reportType == 'year'">
+            and R_YEAR =#{historyReportParams.year}
+        </if>
+    </sql>
+    <sql id="commonTableSQL">
+        SELECT t.userName,
+        t.branch_no,
+        t.BRANCH_NAME,
+        t.WARNING_LEVEL,
+        t.REPORT_TYPE,
+        t.report_year,
+        t.report_quarter,
+        t.report_month,
+        ROUND (SUM (t.response_total_time) / (1000 * 60), 2)
+        AS response_total_time,
+        SUM (t.response_count) AS response_count,
+        ROUND (SUM (t.solve_total_time) / (1000 * 60), 2)
+        AS solve_total_time,
+        SUM (t.solve_count) AS solve_count,
+        CASE NVL(sum(t.response_count) ,0) WHEN 0 THEN 0 ELSE
+        ROUND (
+        SUM (t.response_total_time)
+        / (SUM (t.response_count) * 1000 * 60),
+        2)
+        END AS response_time_each,
+        CASE NVL(sum(t.solve_count) ,0) WHEN 0 THEN 0 ELSE
+        ROUND (
+        SUM (t.solve_total_time)
+        / (SUM (t.solve_count) * 1000 * 60),
+        2)
+        END AS solve_time_each,
+        CASE t.WARNING_LEVEL
+        WHEN '3' THEN '高'
+        WHEN '2' THEN '中'
+        WHEN '1' THEN '低'
+        ELSE '未知等级'
+        END
+        AS warning_level_str
+        FROM v_dih_report t
+        WHERE 1 = 1
+        <if test='queryParams.reportType != null and queryParams.reportType =="day"'>
+            <![CDATA[
+                        AND t.report_type='D'
+                        AND t.report_date >= to_date(#{queryParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+                        AND t.report_date <= to_date(#{queryParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                      ]]>
+        </if>
+        <if test='queryParams.reportType != null and queryParams.reportType =="month" '>
+            AND t.report_type='M' AND t.report_year = #{queryParams.year} AND t.report_month = #{queryParams.month}
+        </if>
+        <if test='queryParams.reportType != null and queryParams.reportType =="quarter" '>
+            AND t.report_type='Q' AND t.report_year = #{queryParams.year} AND t.report_quarter = #{queryParams.quarter}
+        </if>
+        <if test='queryParams.reportType != null and queryParams.reportType =="year" '>
+            AND t.report_type='Y' AND t.report_year = #{queryParams.year}
+        </if>
+        <if test="queryParams.warningLevel != null and queryParams.warningLevel.size() >0 ">
+            AND t.WARNING_LEVEL in
+            <foreach item="item" index="index" collection="queryParams.warningLevel" open="(" separator=","
+                     close=")">
+                #{item}
+            </foreach>
+        </if>
+        <if test="queryParams.isManager == true">
+            AND t.branch_no =#{branchId}
+        </if>
+        <if test="queryParams.isManager == false">
+            AND t.branch_no in
+            (select orgid from tl9_orgbasic
+            start with orgid = #{branchId} and orgstatustypeid != '0'
+            connect by prior orgid = BUSINESS_SUPERIOR and orgstatustypeid != '0')
+        </if>
+        GROUP BY t.userName,
+        t.branch_no,
+        t.BRANCH_NAME,
+        t.WARNING_LEVEL,
+        t.REPORT_TYPE,
+        t.report_year,
+        t.report_quarter,
+        t.report_month
+    </sql>
+    <sql id="dihCommonTableSQL">
+        (
+        select t.mclasskey, t.mclassname, t.manuf_id, t.manuf_name, t.report_type, t.report_year, t.report_quarter,
+        t.report_month,
+        round(sum(t.total_time)/60, 2) as total_time,
+        sum(t.count) as count,
+        CASE NVL(sum(t.count) ,0) WHEN 0 THEN 0 ELSE round( sum(t.total_time) / ( sum(t.count))/60, 2) END as
+        total_supply_each
+        from v_ds_report t
+        where 1 =1
+        <if test='queryParams.reportType !=null and queryParams.reportType =="day"'>
+            <![CDATA[
+                        AND t.report_type='D'
+                        AND t.report_date >= to_date(#{queryParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+                        AND t.report_date <= to_date(#{queryParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                      ]]>
+        </if>
+        <if test=' queryParams.reportType !=null and queryParams.reportType =="month" '>
+            and t.report_type='M' and t.report_year = #{queryParams.year} and t.report_month =
+            #{queryParams.month}
+        </if>
+        <if test=' queryParams.reportType !=null and queryParams.reportType =="quarter" '>
+            and t.report_type='Q' and t.report_year = #{queryParams.year} and t.report_quarter =
+            #{queryParams.quarter}
+        </if>
+        <if test=' queryParams.reportType !=null and queryParams.reportType =="year" '>
+            and t.report_type='Y' and t.report_year = #{queryParams.year}
+        </if>
+        <if test="queryParams.devClassKey !=null and queryParams.devClassKey != ''">
+            and t.mclasskey = #{queryParams.devClassKey}
+        </if>
+        <if test="queryParams.manufacturerIds !=null and queryParams.manufacturerIds.size() > 0">
+            and t.manuf_id in
+            <foreach item="item" index="index" collection="queryParams.manufacturerIds" open="(" separator=","
+                     close=")">
+                #{item}
+            </foreach>
+        </if>
+        <if test="queryParams.manager==true">
+            and t.branch_no =#{branchId}
+        </if>
+        <if test="queryParams.manager==false">
+            and t.branch_no in
+            (select orgid from tl9_orgbasic
+            start with orgid = #{branchId} and orgstatustypeid != '0'
+            connect by prior orgid = BUSINESS_SUPERIOR and orgstatustypeid != '0')
+        </if>
+        group by t.mclasskey, t.mclassname, t.manuf_id, t.manuf_name, t.report_type, t.report_year, t.report_quarter,
+        t.report_month
+        )
+    </sql>
+    <!-- 查询报表信息-->
+    <select id="getHistroyReportList" resultMap="base_result_map">
+        select t.MCLASSKEY,
+        t.MCLASSNAME,
+        t.MMODELKEY,
+        (SELECT DEVMODELNAME FROM TL9_DEVICE_MODEL A WHERE t.MMODELKEY = A.DEVMODELKEY) AS MMODELNAME,
+        t.MANUF_ID,
+        t.MANUF_NAME,
+        Round(SUM(t.NORMAL_TIME_INT)/60,2) AS NORMAL_TIME_INT,
+        <if test="historyReportParams.dataType =='NORMAL'">
+            Round((SUM(t.NORMAL_TIME_INT) - SUM(t.FAULT_TIME_INT))/60,2) AS FAULT_TIME_INT,
+            100-(case when SUM(NORMAL_TIME_INT)!=0
+            then ROUND(SUM(FAULT_TIME_INT)/SUM(NORMAL_TIME_INT),4)*100
+            else 0 end) AS RATE_NUM
+        </if>
+        <if test="historyReportParams.dataType !='NORMAL'">
+            Round(SUM(t.FAULT_TIME_INT)/60,2) AS FAULT_TIME_INT,
+            case when SUM(NORMAL_TIME_INT)!=0
+            then ROUND(SUM(FAULT_TIME_INT)/SUM(NORMAL_TIME_INT),4)*100
+            else 0 end RATE_NUM
+        </if>
+        from
+        <include refid="history_report_table"></include>
+        <where>
+            <include refid="history_report_condition"></include>
+            <if test="historyReportParams.dataType !=null and historyReportParams.dataType !='NORMAL'">
+                and t.M_TYPE =#{historyReportParams.dataType}
+            </if>
+            <if test="historyReportParams.dataType !=null and historyReportParams.dataType =='NORMAL'">
+                and t.M_TYPE ='EQUIPMENT'
+            </if>
+        </where>
+        GROUP BY MMODELKEY,MANUF_ID,MCLASSKEY,MANUF_NAME,MCLASSNAME
+    </select>
+    <select id="getHistroyGraphic" resultMap="base_result_map">
+        SELECT SUM(FAULT_TIME_INT) as FAULT_TIME_INT,
+        SUM(NORMAL_TIME_INT) as NORMAL_TIME_INT,
+        MCLASSKEY,
+        MANUF_ID,
+        <if test="historyReportParams.dataType =='NORMAL'">
+            100-(case when SUM(FAULT_TIME_INT)!=0
+            then ROUND(SUM(FAULT_TIME_INT)/SUM(NORMAL_TIME_INT),4)*100
+            else 0 end) RATE_NUM
+        </if>
+        <if test="historyReportParams.dataType !='NORMAL'">
+            case when SUM(FAULT_TIME_INT)!=0
+            then ROUND(SUM(FAULT_TIME_INT)/SUM(NORMAL_TIME_INT),4)*100
+            else 0 end RATE_NUM
+        </if>
+        FROM
+        <include refid="history_report_table"></include>
+        <where>
+            <include refid="history_report_condition"></include>
+            <if test="historyReportParams.dataType !=null and historyReportParams.dataType !='NORMAL'">
+                and t.M_TYPE =#{historyReportParams.dataType}
+            </if>
+            <if test="historyReportParams.dataType !=null and historyReportParams.dataType =='NORMAL'">
+                and t.M_TYPE ='EQUIPMENT'
+            </if>
+        </where>
+        GROUP BY MANUF_ID,MCLASSKEY
+    </select>
+
+    <select id="getDeviceType" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+        select MCLASSKEY as "devClassKey",MCLASSNAME as "devClassName" from MAS_MCLASS_MONITOR
+        where active = 1
+        <if test="arr !=null and arr.length >0">
+            and MCLASSKEY in
+            <foreach collection="arr" open="(" close=")" item="item" separator=",">
+                #{item}
+            </foreach>
+        </if>
+        order by MCLASSKEY desc
+    </select>
+
+    <select id="queryManuf" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ManufFaultInfo">
+        select m.MANUFACTURERID as "manufId",m.NAME as "manufName"
+        from TL9_DEVICE_MANUFACTURER m
+        <if test="arr != null and arr.length >0 ">
+            where  m.MANUFACTURERID in
+            <foreach collection="arr" separator="," open="(" close=")" item="item">
+                #{item}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="getPeripheralGraphic" resultMap="base_result_map">
+        select MCLASSKEY,MCLASSNAME,MANUF_ID,MANUF_NAME,DEVCLASSKEY,
+        sum(FAULT_TIME_INT) as FAULT_TIME_INT,
+        sum(NORMAL_TIME_INT) AS NORMAL_TIME_INT,
+        case when SUM(NORMAL_TIME_INT)!=0
+        then ROUND(sum(FAULT_TIME_INT)/sum(NORMAL_TIME_INT),4)*100 else 0 end RATE_NUM
+        from (select t.*
+        from
+        <include refid="history_report_table"></include>
+        <where>
+            <if test="branchId !=null">
+                t.branch_no in (select orgid from tl9_orgbasic
+                START WITH orgid = #{branchId} and orgstatustypeid != '0'
+                CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+            </if>
+            <if test="historyReportParams.devClassKey !=null and historyReportParams.devClassKey !=''">
+                and t.mclasskey =#{historyReportParams.devClassKey}
+            </if>
+            <if test="historyReportParams.manufacturerIds !=null and historyReportParams.manufacturerIds.size()  > 0">
+                and t.MANUF_ID in
+                <foreach item="item" index="index" collection="historyReportParams.manufacturerIds" open="("
+                         separator=","
+                         close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="historyReportParams.reportType == 'day'">
+                and t.CREATE_TIME &lt;= to_date(#{historyReportParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                and t.CREATE_TIME &gt;= to_date(#{historyReportParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="historyReportParams.reportType == 'month'">
+                and t.R_MONTH=#{historyReportParams.month} and R_YEAR =#{historyReportParams.year}
+            </if>
+            <if test="historyReportParams.reportType == 'quarter'">
+                and t.R_PERIOD=#{historyReportParams.quarter} and R_YEAR =#{historyReportParams.year}
+            </if>
+            <if test="historyReportParams.reportType == 'year'">
+                and R_YEAR =#{historyReportParams.year}
+            </if>
+            <if test="historyReportParams.dataType !=null">
+                and t.M_TYPE =#{historyReportParams.dataType}
+            </if>
+        </where>
+        )GROUP BY MCLASSKEY,MCLASSNAME,MANUF_ID,MANUF_NAME,DEVCLASSKEY
+    </select>
+
+    <select id="getDeviceClass" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.PeripheralModel">
+		SELECT DISTINCT E.DEVCLASSKEY as peripheralId, E.DEVCLASSNAME as peripheralName
+		  FROM TL9_SM_BRANCH_DEVICE a,
+						TL9_TERMINAL_DEVICE_BIND B
+					 LEFT JOIN
+						TL9_DEVICE_MODEL C
+					 ON B.DEVMODELKEY = C.DEVMODELKEY
+				  LEFT JOIN
+					 TL9_DEVICE_MODEL_CLASS D
+				  ON C.DEVMODELKEY = D.DEVMODELKEY
+			   LEFT JOIN
+				  TL9_DEVICE_CLASS E
+			   ON E.DEVCLASSKEY = D.DEVCLASSKEY
+		 WHERE A.DEVCLASSKEY = #{devClassKey} AND A.TERMINALID = B.TERMINALID
+	</select>
+    <!-- 外设故障情况报表统计 -->
+    <!-- 查询外设开机时长列表 -->
+    <select id="getPeripheralStartUpTimeGather" resultMap="common_peripheral_details_column">
+        select MMODELKEY,MANUF_ID,MCLASSKEY,MANUF_NAME,MCLASSNAME,MNAME,
+        round(SUM(NORMAL_TIME_INT)/60,4) as SUM_NORMAL_TIME_INT
+        from
+        <if test="peripheralParams.reportType == 'day'">
+            MAS_R_DAY_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'month'">
+            MAS_R_MONTH_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'quarter'">
+            MAS_R_PERIOD_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'year'">
+            MAS_R_YEAR_INFO t
+        </if>
+        <where>
+            <if test="peripheralParams.isManager == true">
+                t.branch_no =#{branchId}
+            </if>
+            <if test="peripheralParams.isManager == false">
+                t.branch_no in ( SELECT orgid
+                FROM tl9_orgbasic t
+                START WITH t.orgid = #{branchId,jdbcType=VARCHAR} AND t.orgstatustypeid != '0'
+                CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.orgid AND t.orgstatustypeid != '0')
+            </if>
+            <if test="peripheralParams.devClassKey != null">
+                and t.mclasskey =#{peripheralParams.devClassKey}
+            </if>
+            <if test="peripheralParams.manufacturerIds != null and peripheralParams.manufacturerIds.size() >0">
+                and t.MANUF_ID in
+                <foreach item="item" index="index" collection="peripheralParams.manufacturerIds" open="(" separator=","
+                         close=")">
+                    #{item}
+                </foreach>
+            </if>
+            and t.M_TYPE ='TOOL'
+            <if test="peripheralParams.reportType == 'day'">
+                and t.CREATE_TIME &lt;= to_date(#{peripheralParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                and t.CREATE_TIME &gt;= to_date(#{peripheralParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="peripheralParams.reportType == 'month'">
+                and t.R_MONTH=#{peripheralParams.month} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'quarter'">
+                and t.R_PERIOD=#{peripheralParams.quarter} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'year'">
+                and R_YEAR =#{peripheralParams.year}
+            </if>
+        </where>
+        GROUP BY MMODELKEY,MANUF_ID,MCLASSKEY,MANUF_NAME,MCLASSNAME,MNAME
+    </select>
+    <!-- 查询外设故障率信息集合 -->
+    <select id="getPeripheralFaultRateGatherInfo" resultMap="common_peripheral_details_column">
+        select MCLASSKEY,MCLASSNAME,MMODELKEY,MNAME,MANUF_ID,MANUF_NAME,DEVCLASSKEY,DEVCLASSNAME,
+        round(sum(FAULT_TIME_INT),4) as SUM_FAULT_TIME_INT,
+        case when SUM(NORMAL_TIME_INT)!=0
+        then ROUND(sum(FAULT_TIME_INT)/sum(NORMAL_TIME_INT),4)*100 else 0 end FAULT_TIME_INT_RATE
+        from (select t.*
+        from
+        <if test="peripheralParams.reportType == 'day'">
+            MAS_R_DAY_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'month'">
+            MAS_R_MONTH_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'quarter'">
+            MAS_R_PERIOD_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'year'">
+            MAS_R_YEAR_INFO t
+        </if>
+        <where>
+            t.branch_no in ( SELECT orgid
+            FROM tl9_orgbasic t
+            START WITH t.orgid = #{branchId,jdbcType=VARCHAR} AND t.orgstatustypeid != '0'
+            CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.orgid AND t.orgstatustypeid != '0')
+            <if test="peripheralParams.devClassKey">
+                and t.mclasskey = #{peripheralParams.devClassKey}
+            </if>
+            <if test="peripheralParams.manufacturerIds != null and peripheralParams.manufacturerIds.size() >0">
+                and t.MANUF_ID in
+                <foreach item="item" index="index" collection="peripheralParams.manufacturerIds" open="(" separator=","
+                         close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="models != null and models.size() >0">
+                and t.MMODELKEY in
+                <foreach item="item" index="index" collection="models" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            and t.M_TYPE ='DEVICE'
+            <if test="peripheralParams.reportType == 'day'">
+                and t.CREATE_TIME &lt;= to_date(#{peripheralParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                and t.CREATE_TIME &gt;= to_date(#{peripheralParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="peripheralParams.reportType == 'month'">
+                and t.R_MONTH=#{peripheralParams.month} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'quarter'">
+                and t.R_PERIOD=#{peripheralParams.quarter} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'year'">
+                and R_YEAR =#{peripheralParams.year}
+            </if>
+        </where>
+        )GROUP BY MCLASSKEY,MCLASSNAME,MMODELKEY,MNAME,MANUF_ID,MANUF_NAME,DEVCLASSKEY,DEVCLASSNAME
+    </select>
+    <select id="getEquipmentSupplies" resultMap="equipment_supplies_column">
+        select t2.*
+        from
+        <include refid="dihCommonTableSQL"/>
+        t2
+        <![CDATA[
+			   order by t2.report_year, t2.report_quarter, t2.report_month, t2.mclasskey, t2.manuf_id
+		       ]]>
+    </select>
+    <select id="selectEquipmentSuppliesAVGInfo" resultType="float">
+        select
+        CASE NVL(sum(t2.count) ,0) WHEN 0 THEN 0 ELSE round( sum(t2.total_time) / sum(t2.count), 2) END as
+        TOTAL_SUPPLY_AVG
+        from
+        <include refid="dihCommonTableSQL"/>
+        t2
+    </select>
+    <select id="selectEquipmentSuppliesGraphicInfo" resultMap="equipment_supplies_graphicInfo">
+        select t2.*
+        from
+        <include refid="dihCommonTableSQL"/>
+        t2
+        order by t2.mclasskey, t2.manuf_id
+    </select>
+    <select id="selectManagersFaultHandlingSpeedInfo" resultMap="managers_faultHandlingSpeedInfo">
+        SELECT t2.*
+        FROM ( <include refid="commonTableSQL"></include>) t2
+        ORDER BY t2.report_year,
+        t2.report_quarter,
+        t2.report_month,
+        TO_NUMBER (t2.warning_level) DESC,
+        t2.branch_no,
+        t2.userName
+    </select>
+    <select id="selectManagersFaultHandlingSpeedAVGInfo"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ManagersFaultHandlingSpeedAvgInfo">
+        select
+        CASE NVL(sum(t2.response_count) ,0) WHEN 0 THEN 0 ELSE round( sum(t2.response_total_time) /
+        sum(t2.response_count), 2) END as avgResponseTime,
+        CASE NVL(sum(t2.solve_count) ,0) WHEN 0 THEN 0 ELSE round( sum(t2.solve_total_time) / sum(t2.solve_count), 2)
+        END as avgSolveTime
+        from (<include refid="commonTableSQL"/>) t2
+    </select>
+    <select id="selectManagersFaultHandlingSpeedGraphicInfo" resultMap="managers_faultHandlingSpeed_graphicInfo">
+        <include refid="commonTableSQL"></include>
+    </select>
+    <!-- 查询所有设备管理人员的信息-->
+    <select id="selectAllManagersInfo" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.Operator">
+		SELECT DISTINCT (t1.MANAGER_ID) as userId, T2.USERNAME as userName
+		  FROM TL9_SM_DEVICE_INFO_MAINTAIN t1, tl9_userbasic t2
+		 WHERE t1.MANAGER_ID = T2.USERID
+			   AND T2.ORGID IN
+					  (    SELECT orgid
+							 FROM tl9_orgbasic
+					   START WITH orgid = #{branchId} AND orgstatustypeid != '0'
+					   CONNECT BY PRIOR orgid = BUSINESS_SUPERIOR
+								  AND orgstatustypeid != '0')
+	</select>
+
+    <select id="getHistoryDevicePageList"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryResultList">
+        select
+        MID as "mId",
+        round(SUM(NORMAL_TIME_INT)/60,4) as "normalTime"
+        from
+        <if test="peripheralParams.reportType == 'day'">
+            MAS_R_DAY_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'month'">
+            MAS_R_MONTH_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'quarter'">
+            MAS_R_PERIOD_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'year'">
+            MAS_R_YEAR_INFO t
+        </if>
+        <where>
+            <if test="peripheralParams.isManager == true">
+                t.branch_no =#{branchId}
+            </if>
+            <if test="peripheralParams.isManager == false">
+                t.branch_no in ( SELECT orgid
+                FROM tl9_orgbasic t
+                START WITH t.orgid = #{branchId,jdbcType=VARCHAR} AND t.orgstatustypeid != '0'
+                CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.orgid AND t.orgstatustypeid != '0')
+            </if>
+            and t.M_TYPE ='TOOL'
+            <if test="peripheralParams.manufacturerIds != null and peripheralParams.manufacturerIds.size() >0">
+                and t.MANUF_ID in
+                <foreach item="item" index="index" collection="peripheralParams.manufacturerIds" open="(" separator=","
+                         close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="peripheralParams.devClassKey !=null and peripheralParams.devClassKey!=''">
+                and t.mclasskey=#{peripheralParams.devClassKey}
+            </if>
+            <if test="peripheralParams.modelKey !=null and peripheralParams.modelKey !=''">
+                and t.MMODELKEY = #{peripheralParams.modelKey}
+            </if>
+            <if test="peripheralParams.reportType == 'day'">
+                and t.CREATE_TIME &lt;= to_date(#{peripheralParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                and t.CREATE_TIME &gt;= to_date(#{peripheralParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="peripheralParams.reportType == 'month'">
+                and t.R_MONTH=#{peripheralParams.month} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'quarter'">
+                and t.R_PERIOD=#{peripheralParams.quarter} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'year'">
+                and R_YEAR =#{peripheralParams.year}
+            </if>
+            GROUP BY MID
+        </where>
+    </select>
+
+    <resultMap id="header_info_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryHeaderAndinfo">
+        <result property="deviceClassKey" column="DEVCLASSKEY"></result>
+        <result property="mId" column="MID"></result>
+        <result property="deviceClassName" column="DEVCLASSNAME"></result>
+        <result property="normalTime" column="SUM_FAULT_TIME_INT"></result>
+        <result property="rate" column="FAULT_TIME_INT_RATE"></result>
+    </resultMap>
+
+    <select id="getHistoryHeaderInfo" resultMap="header_info_map">
+        select MID,
+        DEVCLASSKEY,
+        DEVCLASSNAME,
+        round(sum(FAULT_TIME_INT)/60,4) as SUM_FAULT_TIME_INT,
+        case when SUM(NORMAL_TIME_INT)!=0
+        then ROUND(sum(FAULT_TIME_INT)/sum(NORMAL_TIME_INT),4)*100 else 0 end FAULT_TIME_INT_RATE
+        from
+        <if test="peripheralParams.reportType == 'day'">
+            MAS_R_DAY_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'month'">
+            MAS_R_MONTH_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'quarter'">
+            MAS_R_PERIOD_INFO t
+        </if>
+        <if test="peripheralParams.reportType == 'year'">
+            MAS_R_YEAR_INFO t
+        </if>
+        <where>
+            <if test="peripheralParams.isManager == true">
+                t.branch_no =#{branchId}
+            </if>
+            <if test="peripheralParams.isManager == false">
+                t.branch_no in ( SELECT orgid
+                FROM tl9_orgbasic t
+                START WITH t.orgid = #{branchId,jdbcType=VARCHAR} AND t.orgstatustypeid != '0'
+                CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.orgid AND t.orgstatustypeid != '0')
+            </if>
+            <if test="peripheralParams.manufacturerIds != null and peripheralParams.manufacturerIds.size() >0">
+                and t.MANUF_ID in
+                <foreach item="item" index="index" collection="peripheralParams.manufacturerIds" open="(" separator=","
+                         close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="peripheralParams.devClassKey !=null and peripheralParams.devClassKey!=''">
+                and t.mclasskey=#{peripheralParams.devClassKey}
+            </if>
+            <if test="peripheralParams.modelKey !=null and peripheralParams.modelKey !=''">
+                and t.MMODELKEY = #{peripheralParams.modelKey}
+            </if>
+            <if test="mIds !=null and mIds.length>0">
+                and t.MID in
+                <foreach item="item" index="index" collection="mIds" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="peripheralParams.dataType !=null and peripheralParams.dataType !=''">
+                and t.M_TYPE =#{peripheralParams.dataType}
+            </if>
+            <if test="peripheralParams.reportType == 'day'">
+                and t.CREATE_TIME &lt;= to_date(#{peripheralParams.endDate} || '23:59:59','yyyy-mm-dd hh24:mi:ss')
+                and t.CREATE_TIME &gt;= to_date(#{peripheralParams.startDate} || '00:00:00','yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="peripheralParams.reportType == 'month'">
+                and t.R_MONTH=#{peripheralParams.month} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'quarter'">
+                and t.R_PERIOD=#{peripheralParams.quarter} and R_YEAR =#{peripheralParams.year}
+            </if>
+            <if test="peripheralParams.reportType == 'year'">
+                and R_YEAR =#{peripheralParams.year}
+            </if>
+        </where>
+        GROUP BY MID,DEVCLASSKEY,DEVCLASSNAME
+    </select>
+
+    <select id="getHistoryHeader" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryHeaderAndinfo">
+		select DISTINCT
+					E.DEVCLASSKEY as "deviceClassKey",
+					E.DEVCLASSNAME as "deviceClassName"
+					FROM TL9_SM_BRANCH_DEVICE a,TL9_TERMINAL_DEVICE_BIND B
+				LEFT JOIN
+				TL9_DEVICE_MODEL C
+				ON B.DEVMODELKEY = C.DEVMODELKEY
+				LEFT JOIN
+				TL9_DEVICE_MODEL_CLASS D ON C.DEVMODELKEY = D.DEVMODELKEY
+				LEFT JOIN
+				TL9_DEVICE_CLASS E ON E.DEVCLASSKEY = D.DEVCLASSKEY
+				WHERE
+				A.DEVCLASSKEY = #{devClassKey} AND A.TERMINALID= B.TERMINALID
+	</select>
+
+    <resultMap id="error_account_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryErrotAccountInfo">
+        <result property="branchNo" column="branch_no"></result>
+        <result property="branchName" column="branch_name"></result>
+        <result property="sumDealTime" column="total_time"></result>
+        <result property="wrongCount" column="count"></result>
+        <result property="wrongDealTime" column="total_time_each"></result>
+        <result property="dealTimeAvg" column=""></result>
+    </resultMap>
+
+    <select id="getErrorAccountDataList" resultMap="error_account_map">
+        select
+        t.branch_no,
+        t.branch_name,
+        round(sum(t.total_time) / (1000 * 60), 2) as total_time,
+        sum(t.count) as count,
+        round( sum(t.total_time) / (sum(t.count) * 1000 * 60), 2) as total_time_each
+        from v_eah_report t
+        where 1 =1
+        <if test='peripheralParams.reportType !=null and peripheralParams.reportType =="day"'>
+            <![CDATA[
+			  	and t.report_type='D'
+			    and t.report_date >= to_date(#{peripheralParams.startDate} ||'00:00:00' ,'yyyy-mm-dd hh24:mi:ss')
+			  	and t.report_date <= to_date(#{peripheralParams.endDate}|| '23:59:59','yyyy-mm-dd hh24:mi:ss')
+			  ]]>
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="month" '>
+            and t.report_type='M' and t.report_year = #{peripheralParams.year} and t.report_month =
+            #{peripheralParams.month}
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="quarter" '>
+            and t.report_type='Q' and t.report_year = #{peripheralParams.year} and t.report_quarter =
+            #{peripheralParams.quarter}
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="year" '>
+            and t.report_type='Y' and t.report_year = #{peripheralParams.year}
+        </if>
+        <if test=" branchId !=null and branchId !='' ">
+            and t.branch_no in
+            (select orgid from tl9_orgbasic
+            start with orgid = #{branchId} and orgstatustypeid != '0'
+            connect by prior orgid = BUSINESS_SUPERIOR and orgstatustypeid != '0')
+        </if>
+        group by t.branch_no, t.branch_name
+    </select>
+
+    <select id="getErrorAccountDataAvg" resultType="float">
+        select
+        round( sum(t.total_time) / (sum(t.count)*1000*60), 2) as TOTAL_TIME_AVG
+        from v_eah_report t
+        where 1 =1
+        <if test='peripheralParams.reportType !=null and peripheralParams.reportType =="day"'>
+            <![CDATA[
+			  	and t.report_type='D'
+			  	and t.report_date >= to_date(#{peripheralParams.startDate} ||'00:00:00' ,'yyyy-mm-dd hh24:mi:ss')
+			  	and t.report_date <= to_date(#{peripheralParams.endDate}|| '23:59:59','yyyy-mm-dd hh24:mi:ss')
+			  ]]>
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="month" '>
+            and t.report_type='M' and t.report_year = #{peripheralParams.year} and t.report_month =
+            #{peripheralParams.month}
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="quarter" '>
+            and t.report_type='Q' and t.report_year = #{peripheralParams.year} and t.report_quarter =
+            #{peripheralParams.quarter}
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="year" '>
+            and t.report_type='Y' and t.report_year = #{peripheralParams.year}
+        </if>
+        <if test=" branchId !=null and branchId !='' ">
+            and t.branch_no in
+            (select orgid from tl9_orgbasic
+            start with orgid = #{branchId} and orgstatustypeid != '0'
+            connect by prior orgid = BUSINESS_SUPERIOR and orgstatustypeid != '0')
+        </if>
+    </select>
+
+    <select id="getErrorAccountDataForGraph" resultMap="error_account_map">
+        select
+        t.branch_no,
+        t.branch_name,
+        round( sum(t.total_time) / (sum(t.count) * 1000 * 60), 2) as total_time_each
+        from v_eah_report t
+        where 1 =1
+        <if test='peripheralParams.reportType !=null and peripheralParams.reportType =="day"'>
+            <![CDATA[
+			  	and t.report_type='D'
+			  	and t.report_date >= to_date(#{peripheralParams.startDate} ||'00:00:00' ,'yyyy-mm-dd hh24:mi:ss')
+			  	and t.report_date <= to_date(#{peripheralParams.endDate}|| '23:59:59','yyyy-mm-dd hh24:mi:ss')
+			  ]]>
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="month" '>
+            and t.report_type='M' and t.report_year = #{peripheralParams.year} and t.report_month =
+            #{peripheralParams.month}
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="quarter" '>
+            and t.report_type='Q' and t.report_year = #{peripheralParams.year} and t.report_quarter =
+            #{peripheralParams.quarter}
+        </if>
+        <if test=' peripheralParams.reportType !=null and peripheralParams.reportType =="year" '>
+            and t.report_type='Y' and t.report_year = #{peripheralParams.year}
+        </if>
+        <if test=" branchId !=null and branchId !='' ">
+            and t.branch_no in
+            (select orgid from tl9_orgbasic
+            start with orgid = #{branchId} and orgstatustypeid != '0'
+            connect by prior orgid = BUSINESS_SUPERIOR and orgstatustypeid != '0')
+        </if>
+        group by t.branch_no, t.branch_name
+    </select>
+
+    <select id="getTranTypeCondition" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.HistoryTranType">
+        select distinct
+        c.resourceid as "id",
+        c.resourcename as "name"
+        from tl9_resourcebasic c
+        where 1 = 1
+        <if test=' systemId !=null and systemId!="" '>
+            and c.systemid = #{systemId}
+        </if>
+        and c.resourceid in (
+        with a as (select * from mas_monitor_config where TYPE_NO='REPORTPARAM' and CODE_NO='TRAN_TYPE')
+        select regexp_substr(a.CODE_VALUE,'[^\]+',1,level) as func from a
+        connect by level &lt;=regexp_count(a.CODE_VALUE,'\\')+1
+        )
+    </select>
+
+    <select id="getTranQualityDataList"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.HistoryTransQualityParams"
+            resultMap="base_trans_quality_map">
+        select t2.*
+        from
+        <include refid="tran_quality_sql"/>
+        order by t2.report_year, t2.report_quarter, t2.report_month, t2.biz_type desc
+    </select>
+
+    <select id="getTranQualityDataAvg"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.HistoryTransQualityParams"
+            resultType="java.lang.Float">
+        select
+        case sum(t2.success_biz_total_count + t2.fail_biz_total_count)
+        when 0 then 0
+        else round( sum(t2.success_biz_total_count) * 100 /
+        sum(t2.success_biz_total_count + t2.fail_biz_total_count) ,
+        2)
+        end
+        as SUCCESS_BIZ_TOTAL_RATIO_AVG
+        from
+        <include refid="tran_quality_sql"/>
+    </select>
+
+    <select id="getTranQualityDataForGraph" resultMap="base_trans_quality_map"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.HistoryTransQualityParams">
+        select t2.*
+        from
+        <include refid="tran_quality_sql"/>
+        order by t2.biz_type desc
+    </select>
+
+    <select id="getTranQualityDataForListByBranchDetail" resultMap="base_trans_quality_map"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.HistoryTransQualityParams">
+        select t2.*
+        from (
+        select
+        t.branch_no,
+        t.branch_name,
+        t.biz_type,
+        t.REPORT_TYPE, t.report_year, t.report_quarter, t.report_month,
+        sum(t.success_biz_count) as success_biz_total_count,
+        sum(t.fail_biz_count) as fail_biz_total_count,
+        case sum(t.success_biz_count + t.fail_biz_count)
+        when 0 then 0
+        else
+        round( sum(t.success_biz_count) * 100 / sum(t.success_biz_count + t.fail_biz_count), 2)
+        end as
+        success_biz_total_ratio,
+        case sum(t.success_biz_count + t.fail_biz_count)
+        when 0 then 0
+        else
+        round( sum(t.fail_biz_count) * 100 / sum(t.success_biz_count + t.fail_biz_count), 2)
+        end
+        as fail_biz_total_ratio,
+        t.biz_name as biz_type_str
+        from v_dtq_report t
+        where 1 =1
+        <if test='reportType !=null and reportType =="day"'>
+            <![CDATA[
+			  	and t.report_type='D'
+			  	and t.report_date >= to_date(#{reportDateStart} ||'00:00:00' ,'yyyy-mm-dd hh24:mi:ss')
+			  	and t.report_date <= to_date(#{reportDateEnd}|| '23:59:59','yyyy-mm-dd hh24:mi:ss')
+			  ]]>
+        </if>
+        <if test=' reportType !=null and reportType =="month" '>
+            and t.report_type='M'
+            and t.report_year = #{reportYear}
+            and t.report_month = #{reportMonth}
+        </if>
+        <if test=' reportType !=null and reportType =="quarter" '>
+            and t.report_type='Q' and t.report_year = #{reportYear} and t.report_quarter = #{reportQuarter}
+        </if>
+        <if test=' reportType !=null and reportType =="year" '>
+            and t.report_type='Y' and t.report_year = #{reportYear}
+        </if>
+        <if test=" branchNo !=null and branchNo !='' ">
+            and t.branch_no =#{branchNo}
+        </if>
+        group by t.branch_no,t.branch_name,t.biz_type, t.biz_name, t.REPORT_TYPE, t.report_year, t.report_quarter,
+        t.report_month
+        )t2
+        order by t2.report_year, t2.report_quarter, t2.report_month, t2.biz_type desc
+    </select>
+    <select id="selectOrgReportTitle" resultType="string">
+       SELECT t.ORGNAME_CN
+       FROM tl9_orgbasic t start with t.ORGID=#{branchId}
+       connect by prior t.BUSINESS_SUPERIOR=T.ORGID
+       ORDER BY t.ORGLEVELID
+    </select>
+
+    <!--柜员满意度评价-->
+    <select id="getSatisfactionTellerInfoList"  parameterType="com.dcfs.smartaibank.manager.monitor.web.param.SatisfactionTellerParams"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.SatisfactionTellerInfo">
+        <if test=" satisfactionTellerParams.reportType == 'day'">
+            select
+            UNIT_NAME,
+            BRANCH_NO,
+            BRANCH_NAME,
+            POSITIVE_COUNT,
+            (EVALUATE_COUNT-(POSITIVE_COUNT+NEGATIVE_COUNT)) as MID_COUNT,
+            NEGATIVE_COUNT,
+            (EVALUATE_FLAG_COUNT-EVALUATE_COUNT) as UNEVALUATE_COUNT
+            from SB_STATS_USER_D T where  BRANCH_NO = #{branchId}
+            <if test="satisfactionTellerParams.endDate.equals(satisfactionTellerParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{satisfactionTellerParams.startDate})
+            </if>
+            <if test="!satisfactionTellerParams.endDate.equals(satisfactionTellerParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{satisfactionTellerParams.startDate}) and to_number(#{satisfactionTellerParams.endDate})
+            </if>
+        </if>
+        <if test=" satisfactionTellerParams.reportType == 'month'">
+            select
+            UNIT_NAME,
+            BRANCH_NO,
+            BRANCH_NAME,
+            POSITIVE_COUNT,
+            (EVALUATE_COUNT-(POSITIVE_COUNT+NEGATIVE_COUNT)) as MID_COUNT,
+            NEGATIVE_COUNT,
+            (EVALUATE_FLAG_COUNT-EVALUATE_COUNT) as UNEVALUATE_COUNT
+            from SB_STATS_USER_M T where  BRANCH_NO = #{branchId}
+            <if test=" satisfactionTellerParams.month.length() == 1">
+                AND T.TRADE_YM = CONCAT(CONCAT(#{satisfactionTellerParams.year},'0'),#{satisfactionTellerParams.month})
+            </if>
+            <if test=" satisfactionTellerParams.month.length() == 2">
+                AND T.TRADE_YM = CONCAT(#{satisfactionTellerParams.year},#{satisfactionTellerParams.month})
+            </if>
+        </if>
+    </select>
+    <!--机构满意度评价-->
+    <select id="getsatisfactionOrgReportInfoList"  parameterType="com.dcfs.smartaibank.manager.monitor.web.param.SatisfactionOrgReportParams"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.SatisfactionOrgReportInfo">
+        <if test=" satisfactionOrgReportParams.reportType == 'day'">
+            select
+            UNIT_NAME,
+            BRANCH_NO,
+            BRANCH_NAME,
+            POSITIVE_COUNT,
+            (EVALUATE_COUNT-(POSITIVE_COUNT+NEGATIVE_COUNT)) as MID_COUNT,
+            NEGATIVE_COUNT,
+            (EVALUATE_FLAG_COUNT-EVALUATE_COUNT) as UNEVALUATE_COUNT
+            from SB_STATS_GATHER_D T where  BRANCH_NO = #{branchId}
+            <if test="satisfactionOrgReportParams.endDate.equals(satisfactionOrgReportParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{satisfactionOrgReportParams.startDate})
+            </if>
+            <if test="!satisfactionOrgReportParams.endDate.equals(satisfactionOrgReportParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{satisfactionOrgReportParams.startDate}) and to_number(#{satisfactionOrgReportParams.endDate})
+            </if>
+        </if>
+        <if test=" satisfactionOrgReportParams.reportType == 'month'">
+            select
+            UNIT_NAME,
+            BRANCH_NO,
+            BRANCH_NAME,
+            POSITIVE_COUNT,
+            (EVALUATE_COUNT-(POSITIVE_COUNT+NEGATIVE_COUNT)) as MID_COUNT,
+            NEGATIVE_COUNT,
+            (EVALUATE_FLAG_COUNT-EVALUATE_COUNT) as UNEVALUATE_COUNT
+            from SB_STATS_GATHER_M T where  BRANCH_NO = #{branchId}
+            <if test=" satisfactionOrgReportParams.month.length() == 1">
+                AND T.TRADE_YM = CONCAT(CONCAT(#{satisfactionOrgReportParams.year},'0'),#{satisfactionOrgReportParams.month})
+            </if>
+            <if test=" satisfactionOrgReportParams.month.length() == 2">
+                AND T.TRADE_YM = CONCAT(#{satisfactionOrgReportParams.year},#{satisfactionOrgReportParams.month})
+            </if>
+        </if>
+    </select>
+
+    <select id="getzhtradetimeInfoList"  parameterType="com.dcfs.smartaibank.manager.monitor.web.param.TradeTimeZhParams">
+        <if test=" tradeTimeZhParams.reportType == 'day'">
+            SELECT * FROM (
+            SELECT  T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(T.HANDLE_TIME_AVG ,4)as handleTimeAvg,
+            round(T.HANDLE_TIME_T_AVG ,2)as handleTimeTAvg ,
+            round(((T.HANDLE_TIME_AVG/T.HANDLE_TIME_T_AVG)-1),4) as handleTimeAvgTAvgAndAvg
+            FROM SB_STATS_EFFIC_TRANS_D T
+            WHERE  T.BRANCH_NO=#{branchId}
+            <if test="tradeTimeZhParams.endDate.equals(tradeTimeZhParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{tradeTimeZhParams.startDate})
+            </if>
+            <if test="!tradeTimeZhParams.endDate.equals(tradeTimeZhParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{tradeTimeZhParams.startDate}) and to_number(#{tradeTimeZhParams.endDate})
+            </if>
+            ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+            WHERE ROWNUM  &lt; 100
+        </if>
+        <if test=" tradeTimeZhParams.reportType == 'month'">
+            SELECT * FROM (
+            SELECT  T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(T.HANDLE_TIME_AVG ,4)as handleTimeAvg,
+            round(T.HANDLE_TIME_T_AVG ,2)as handleTimeTAvg ,
+            round(((T.HANDLE_TIME_AVG/T.HANDLE_TIME_T_AVG)-1),4) as handleTimeAvgTAvgAndAvg
+            FROM SB_STATS_EFFIC_TRANS_M T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test=" tradeTimeZhParams.month.length() == 1">
+                AND T.TRADE_YM = concat(concat(#{tradeTimeZhParams.year},'0'),#{tradeTimeZhParams.month})
+            </if>
+            <if test=" tradeTimeZhParams.month.length() == 2">
+                AND T.TRADE_YM = concat(#{tradeTimeZhParams.year},#{tradeTimeZhParams.month})
+            </if>
+            ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+            WHERE ROWNUM  &lt; 100
+        </if>
+    </select>
+
+    <select id="getleadertradetimeInfoList"  parameterType="com.dcfs.smartaibank.manager.monitor.web.param.TradeTimeLeaderParams">
+        <if test=" tradeTimeLeaderParams.reportType == 'day'">
+            SELECT * FROM (
+            SELECT  T.BRANCH_NO as branchNo ,
+            T.BRANCH_NAME as branchName,
+            T.USER_NO as userNo,
+            T.USER_NAME as userName,
+            round(T.HANDLE_TIME_TOTAL ,2)as handleTimeTotal,
+            round(T.HANDLE_TIME_T_AVG ,2)as handleTimeTAvg,
+            round(((T.HANDLE_TIME_TOTAL/T.HANDLE_TIME_T_AVG)-1),4) as handleTimeTotalAndTAvg
+            FROM SB_STATS_USER_TRANS_D T
+            WHERE  T.BRANCH_NO=#{branchId}
+            <if test="tradeTimeLeaderParams.endDate.equals(tradeTimeLeaderParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{tradeTimeLeaderParams.startDate})
+            </if>
+            <if test="!tradeTimeLeaderParams.endDate.equals(tradeTimeLeaderParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{tradeTimeLeaderParams.startDate}) and to_number(#{tradeTimeLeaderParams.endDate})
+            </if>
+            ORDER BY T.TRAN_COUNT desc)
+            WHERE ROWNUM  &lt; 100
+        </if>
+        <if test=" tradeTimeLeaderParams.reportType == 'month'">
+            SELECT * FROM (
+            SELECT  T.BRANCH_NO as branchNo ,
+            T.BRANCH_NAME as branchName,
+            T.USER_NO as userNo,
+            T.USER_NAME as userName,
+            round(T.HANDLE_TIME_TOTAL ,2)as handleTimeTotal,
+            round(T.HANDLE_TIME_T_AVG ,2)as handleTimeTAvg,
+            round(((T.HANDLE_TIME_TOTAL/T.HANDLE_TIME_T_AVG)-1),4) as handleTimeTotalAndTAvg
+            FROM SB_STATS_USER_TRANS_M T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test=" tradeTimeLeaderParams.month.length() == 1">
+                AND T.TRADE_YM = concat(concat(#{tradeTimeLeaderParams.year},'0'),#{tradeTimeLeaderParams.month})
+            </if>
+            <if test=" tradeTimeLeaderParams.month.length() == 2">
+                AND T.TRADE_YM = concat(#{tradeTimeLeaderParams.year},#{tradeTimeLeaderParams.month})
+            </if>
+            ORDER BY T.TRAN_COUNT desc, T.TRAN_CODE asc)
+            WHERE ROWNUM  &lt; 100
+        </if>
+    </select>
+
+    <select id="getquWaitTimeInfoList" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.QuWaitTimeInfo" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.QuWaitTimeParams">
+        <if test=" quWaitTimeParams.reportType == 'day'">
+            SELECT  T.BRANCH_NO as branchNo ,
+            T.BRANCH_NAME as branchName,
+            T.TRADE_YM as tradeYm,
+            T.UNIT_NAME as unitName,
+            T.WAIT_TIME_AVG as waitTimeAvg
+            FROM SB_STATS_GATHER_D T
+            WHERE  T.BRANCH_NO=#{branchId}
+            <if test="quWaitTimeParams.endDate.equals(quWaitTimeParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{quWaitTimeParams.startDate})
+            </if>
+            <if test="!quWaitTimeParams.endDate.equals(quWaitTimeParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{quWaitTimeParams.startDate}) and to_number(#{quWaitTimeParams.endDate})
+            </if>
+        </if>
+        <if test=" quWaitTimeParams.reportType == 'month'">
+            SELECT  T.BRANCH_NO as branchNo ,
+            T.BRANCH_NAME as branchName,
+            T.TRADE_YM as tradeYm,
+            T.UNIT_NAME as unitName,
+            T.WAIT_TIME_AVG as waitTimeAvg
+            FROM SB_STATS_GATHER_M T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test=" quWaitTimeParams.month.length() == 1">
+                AND T.TRADE_YM = concat(concat(#{quWaitTimeParams.year},'0'),#{quWaitTimeParams.month})
+            </if>
+            <if test=" quWaitTimeParams.month.length() == 2">
+                AND T.TRADE_YM = concat(#{quWaitTimeParams.year},#{quWaitTimeParams.month})
+            </if>
+        </if>
+    </select>
+
+
+    <select id="getTradeTimeBranchReportInfoList" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TradeTimeBranchReportInfo"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.TradeTimeBranchParams">
+        <if test=" tradeTimeBranchParams.reportType == 'day'">
+            SELECT T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(T.HANDLE_TIME_AVG ,4)as handleTimeAvg,
+            round(T.HANDLE_TIME_T_AVG,2) as handleTimeTAvg,
+            round((T.HANDLE_TIME_AVG/T.HANDLE_TIME_T_AVG)-1,4) as touchAvg
+            FROM SB_STATS_EFFIC_TRANS_D T
+            WHERE  T.BRANCH_NO = #{branchId}
+            <if test="tradeTimeBranchParams.endDate.equals(tradeTimeBranchParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{tradeTimeBranchParams.startDate})
+            </if>
+            <if test="!tradeTimeBranchParams.endDate.equals(tradeTimeBranchParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{tradeTimeBranchParams.startDate}) and to_number(#{tradeTimeBranchParams.endDate})
+            </if>
+        </if>
+        <if test=" tradeTimeBranchParams.reportType == 'month'">
+            SELECT T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(T.HANDLE_TIME_AVG ,4)as handleTimeAvg,
+            round(T.HANDLE_TIME_T_AVG,2) as handleTimeTAvg,
+            round((T.HANDLE_TIME_AVG/T.HANDLE_TIME_T_AVG)-1,4) as touchAvg
+            FROM SB_STATS_EFFIC_TRANS_M T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test=" tradeTimeBranchParams.month.length() == 1">
+                AND T.TRADE_YM = concat(concat(#{tradeTimeBranchParams.year},'0'),#{tradeTimeBranchParams.month})
+            </if>
+            <if test=" tradeTimeBranchParams.month.length() == 2">
+                AND T.TRADE_YM = concat(#{tradeTimeBranchParams.year},#{tradeTimeBranchParams.month})
+            </if>
+        </if>
+    </select>
+    <select id="getTradeTimeCounterClerkReportInfoList" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.TradeTimeCounterClerkReportInfo"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.TradetimecounterclerkParams">
+        <if test=" tradetimecounterclerkParams.reportType == 'day'">
+            SELECT T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.USER_NO as userNo,
+            T.USER_NAME as userName,
+            round(T.HANDLE_TIME_TOTAL ,4)as handleTimeTotal,
+            round(T.HANDLE_TIME_T_AVG,2) as handleTimeTAvg,
+            round((T.HANDLE_TIME_TOTAL/T.HANDLE_TIME_T_AVG)-1,4) as handleTime
+            FROM SB_STATS_USER_TRANS_D T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test="tradetimecounterclerkParams.endDate.equals(tradetimecounterclerkParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{tradetimecounterclerkParams.startDate})
+            </if>
+            <if test="!tradetimecounterclerkParams.endDate.equals(tradetimecounterclerkParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{tradetimecounterclerkParams.startDate}) and to_number(#{tradetimecounterclerkParams.endDate})
+            </if>
+        </if>
+        <if test=" tradetimecounterclerkParams.reportType == 'month'">
+            SELECT T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.USER_NO as userNo,
+            T.USER_NAME as userName,
+            round(T.HANDLE_TIME_TOTAL ,4)as handleTimeTotal,
+            round(T.HANDLE_TIME_T_AVG,2) as handleTimeTAvg,
+            round((T.HANDLE_TIME_TOTAL/T.HANDLE_TIME_T_AVG)-1,4) as handleTime
+            FROM SB_STATS_USER_TRANS_D T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test=" tradetimecounterclerkParams.month.length() == 1">
+                AND T.TRADE_YM = concat(concat(#{tradetimecounterclerkParams.year},'0'),#{tradetimecounterclerkParams.month})
+            </if>
+            <if test=" tradetimecounterclerkParams.month.length() == 2">
+                AND T.TRADE_YM = concat(#{tradetimecounterclerkParams.year},#{tradetimecounterclerkParams.month})
+            </if>
+        </if>
+    </select>
+
+    <select id="getwaittingTimebranchReportInfoList" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.WaittingTimebranchReportInfo"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.WaittingTimebranchParams">
+        <if test=" waittingTimebranchParams.reportType == 'day'">
+            SELECT  T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as receiveCount,
+            round(T.WAIT_TIME_AVG,2) as waitTimeAvg
+            FROM SB_STATS_GATHER_D T
+            WHERE  T.BRANCH_NO = #{branchId}
+            <if test="waittingTimebranchParams.endDate.equals(waittingTimebranchParams.startDate)">
+                AND T.TRADE_DATE=to_number(#{waittingTimebranchParams.startDate})
+            </if>
+            <if test="!waittingTimebranchParams.endDate.equals(waittingTimebranchParams.startDate)">
+                AND T.TRADE_DATE between to_number(#{waittingTimebranchParams.startDate}) and to_number(#{waittingTimebranchParams.endDate})
+            </if>
+        </if>
+        <if test=" waittingTimebranchParams.reportType == 'month'">
+            SELECT  T.UNIT_NAME as unitName ,
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as receiveCount,
+            round(T.WAIT_TIME_AVG,2) as waitTimeAvg
+            FROM SB_STATS_GATHER_M T
+            WHERE T.BRANCH_NO = #{branchId}
+            <if test=" waittingTimebranchParams.month.length() == 1">
+                AND T.TRADE_YM = concat(concat(#{waittingTimebranchParams.year},'0'),#{waittingTimebranchParams.month})
+            </if>
+            <if test=" waittingTimebranchParams.month.length() == 2">
+                AND T.TRADE_YM = concat(#{waittingTimebranchParams.year},#{waittingTimebranchParams.month})
+            </if>
+        </if>
+    </select>
+
+
+    <select id="getServiceTimeReportInfoList" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ServiceTimeReportInfo"
+            parameterType="com.dcfs.smartaibank.manager.monitor.web.param.ServiceTimeParams">
+        <if test=" serviceTimeParams.reportType == 'day'">
+            SELECT  a.UNIT_NAME as unitName ,
+            a.BRANCH_NO as branchNo,
+            a.BRANCH_NAME as branchName,
+            b.USER_NO as userNo,
+            b.USER_NAME as userName,
+            b.HANDLE_TIME_TOTAL as handleTimeTotal
+            FROM SB_STATS_EFFIC_D a left join SB_STATS_USER_D b on a.BRANCH_NO = b.BRANCH_NO
+            WHERE  a.BRANCH_NO = #{branchId}
+            <if test="serviceTimeParams.endDate.equals(serviceTimeParams.startDate)">
+                AND a.TRADE_DATE=to_number(#{serviceTimeParams.startDate})
+            </if>
+            <if test="!serviceTimeParams.endDate.equals(serviceTimeParams.startDate)">
+                AND a.TRADE_DATE between to_number(#{serviceTimeParams.startDate}) and to_number(#{serviceTimeParams.endDate})
+            </if>
+        </if>
+        <if test=" serviceTimeParams.reportType == 'month'">
+            SELECT  a.UNIT_NAME as unitName ,
+            a.BRANCH_NO as branchNo,
+            a.BRANCH_NAME as branchName,
+            b.USER_NO as userNo,
+            b.USER_NAME as userName,
+            b.HANDLE_TIME_TOTAL as handleTimeTotal
+            FROM SB_STATS_EFFIC_M a left join SB_STATS_USER_M b on a.BRANCH_NO = b.BRANCH_NO
+            WHERE  a.BRANCH_NO = #{branchId}
+            <if test=" serviceTimeParams.month.length() == 1">
+                AND a.TRADE_YM = concat(concat(#{serviceTimeParams.year},'0'),#{serviceTimeParams.month})
+            </if>
+            <if test=" serviceTimeParams.month.length() == 2">
+                AND a.TRADE_YM = concat(#{serviceTimeParams.year},#{serviceTimeParams.month})
+            </if>
+        </if>
+    </select>
+    <select id="getTime" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ClientFlowReportInfo">
+        select m.BRANCH_NO as "branchNo",m.APPLY_TIME_STEP as "applyTimeStep"
+        from SB_STATS_ENT_TIME_D m
+        <if test="branchNo != null and branchNo.length >0 ">
+            where  m.BRANCH_NO in
+            <foreach collection="branchNo" separator="," open="(" close=")" item="applyTimeStep">
+                #{applyTimeStep}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="queryCount" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ClientFlowReportInfo">
+        select m.BRANCH_NO as "branchNo",m.RECEIVE_COUNT as "receiveCount"
+        from SB_STATS_ENT_TIME_D m
+        <if test="branchNo != null and branchNo.length >0 ">
+            where  m.BRANCH_NO in
+            <foreach collection="branchNo" separator="," open="(" close=")" item="receiveCount">
+                #{receiveCount}
+            </foreach>
+        </if>
+    </select>
+</mapper>

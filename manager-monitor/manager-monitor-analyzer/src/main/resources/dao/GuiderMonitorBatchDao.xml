@@ -1,0 +1,1203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.GuiderMonitorBatchDao">
+	<!-- 删除机构繁忙度数据 -->
+	<delete id="clearBranchBusyData">
+		TRUNCATE TABLE MAS_QUEUE_BRANCH_F
+	</delete>
+
+	<!-- 删除村镇繁忙度数据 -->
+	<delete id="clearCountyBusyData">
+		TRUNCATE TABLE MAS_QUEUE_COUNTY_F
+	</delete>
+
+	<!-- 删除城市繁忙度数据 -->
+	<delete id="clearCityBusyData">
+		TRUNCATE TABLE MAS_QUEUE_CITY_F
+	</delete>
+
+	<!-- 删除省繁忙度数据 -->
+	<delete id="clearProvinceBusyData">
+		TRUNCATE TABLE MAS_QUEUE_PROVINCE_F
+	</delete>
+
+	<!-- 删除国家繁忙度数据 -->
+	<delete id="clearCountryBusyData">
+		TRUNCATE TABLE MAS_QUEUE_COUNTRY_F
+	</delete>
+	<!-- 插入或更新机构繁忙度数据 -->
+	<update id="insertOrUpdateBranchBusyData">
+		MERGE INTO MAS_QUEUE_BRANCH_F A
+		USING (SELECT CASE
+						WHEN e.busi_status = '0' THEN
+						 '0'
+						WHEN NVL(e.avg_wait_time, 0) &lt;= g.wait_time_idle_limit_data AND
+							 NVL(e.avg_wait_count_win, 0) &lt;=
+							 g.wait_people_idle_limit_data THEN
+						 '1'
+						WHEN NVL(e.avg_wait_time, 0) &gt; g.wait_time_idle_limit_data AND
+							 NVL(e.avg_wait_time, 0) &lt;= g.wait_time_busy_limit_data AND
+							 NVL(e.avg_wait_count_win, 0) &lt;
+							 g.wait_people_busy_limit_data THEN
+						 '2'
+						WHEN NVL(e.avg_wait_time, 0) &lt; g.wait_time_busy_limit_data AND
+							 NVL(e.avg_wait_count_win, 0) &gt;
+							 g.wait_people_idle_limit_data AND
+							 NVL(e.avg_wait_count_win, 0) &lt;=
+							 g.wait_people_busy_limit_data THEN
+						 '2'
+						WHEN NVL(e.avg_wait_time, 0) &gt; g.wait_time_busy_limit_data AND
+							 NVL(e.avg_wait_count_win, 0) &lt;
+							 g.wait_people_busy_limit_data THEN
+						 '3'
+						WHEN NVL(e.avg_wait_time, 0) &lt; g.wait_time_busy_limit_data AND
+							 NVL(e.avg_wait_count_win, 0) &gt;
+							 g.wait_people_busy_limit_data THEN
+						 '3'
+						ELSE
+						 '4'
+					  END busi_status,
+					  e.branch_no,
+					  e.handle_county,
+					  e.handle_city,
+					  e.handle_province,
+					  e.wait_count,
+					  e.avg_wait_count_win,
+					  e.total_wait_time,
+					  e.avg_wait_time,
+					  e.max_wait_time,
+					  e.work_windows_number,
+					  e.idle_windows_number
+				 FROM (SELECT CASE
+								WHEN h.status IS NULL THEN
+								 '0'
+								ELSE
+								 '1'
+							  END busi_status,
+							  f.orgid as branch_no,
+							  f.address_county as handle_county,
+							  f.address_city as handle_city,
+							  f.address_province as handle_province,
+							  NVL(wait_count, 0) as wait_count,
+							  NVL(wait_count_avg, 0) as avg_wait_count_win,
+							  NVL(total_wait_time, 0) as total_wait_time,
+							  NVL(wait_time_avg, 0) as avg_wait_time,
+							  NVL(max_wait_time, 0) as max_wait_time,
+							  NVL(open_win_count, 0) as work_windows_number,
+							  NVL(idle_windows_number, 0) as idle_windows_number
+						 FROM tl9_orgbasic f
+						 LEFT JOIN (SELECT a.branch_no,
+										  a.wait_count,
+										  a.max_wait_time,
+										  a.total_wait_time,
+										  b.open_win_count,
+										  b.win_count - b.open_win_count idle_windows_number,
+										  CASE
+											WHEN wait_count = 0 THEN
+											 0
+											ELSE
+											 TRUNC(total_wait_time / wait_count)
+										  END wait_time_avg,
+										  CASE
+											WHEN open_win_count = 0 THEN
+											 0
+											ELSE
+											 ROUND(wait_count / open_win_count)
+										  END wait_count_avg
+									 FROM (SELECT COUNT(CASE
+														  WHEN queue_status = '0' THEN
+														   1
+														  ELSE
+														   NULL
+														END) wait_count,
+												  MAX(CASE
+														WHEN queue_status = '0' THEN
+														 TRUNC(((SYSDATE - DATE '1970-01-01') * 24 * 60 * 60 -
+															   apply_time) / 60)
+														ELSE
+														 0
+													  END) max_wait_time,
+												  TRUNC(SUM(CASE
+															  WHEN queue_status = '0' THEN
+															   ((SYSDATE - DATE '1970-01-01') * 24 * 60 * 60 -
+															   apply_time)
+															  ELSE
+															   0
+															END) / 60) total_wait_time,
+												  branch_no
+											 FROM MAS_QUEUE_BUSI_INFO
+											GROUP BY branch_no) a
+									 LEFT JOIN (SELECT COUNT(CASE
+															  WHEN onoffsign = 1 THEN
+															   1
+															  ELSE
+															   NULL
+															END) win_count,
+													  COUNT(CASE
+															  WHEN window_status = 1 THEN
+															   1
+															  ELSE
+															   NULL
+															END) open_win_count,
+													  win_brch_no
+												 FROM TL9_SM_BRANCH_WIN_BUSI_INFO
+												GROUP BY win_brch_no) b ON b.win_brch_no =
+																		   a.branch_no) e ON f.orgid =
+																							 e.branch_no
+						 LEFT JOIN (SELECT a.branch_no, '1' status
+									 FROM tl9_qu_branch_time   a,
+										  tl9_qu_work_calendar b
+									WHERE a.branch_no = b.branch_no
+									  AND a.calender_type = b.calendar_type
+									  AND b.calendar_year = to_char(sysdate, 'yyyy')
+									  AND b.calendar_month = to_char(sysdate, 'mm')
+									  AND b.calendar_day = to_char(sysdate, 'dd')
+									  AND a.work_open_time &lt;
+										  to_char(sysdate, 'hh24:mi')
+									  AND a.work_close_time &gt;
+										  to_char(sysdate, 'hh24:mi')) h ON h.branch_no =
+																			f.orgid
+						WHERE (f.orglevelid = '3' OR f.orgtypeid = '1')) e,
+					  tl9_qu_monitor_param g
+				WHERE 1=1) B
+		ON (A.branch_no = B.branch_no)
+		WHEN MATCHED THEN
+		  UPDATE
+			 SET busi_status         = B.busi_status,
+				 wait_count          = B.wait_count,
+				 avg_wait_count_win  = b.avg_wait_count_win,
+				 total_wait_time     = b.total_wait_time,
+				 avg_wait_time       = b.avg_wait_time,
+				 max_wait_time       = b.max_wait_time,
+				 work_windows_number = b.work_windows_number,
+				 idle_windows_number = b.idle_windows_number
+		WHEN NOT MATCHED THEN
+		  INSERT
+			(busi_status,
+			 branch_no,
+			 handle_county,
+			 handle_city,
+			 handle_province,
+			 wait_count,
+			 avg_wait_count_win,
+			 total_wait_time,
+			 avg_wait_time,
+			 max_wait_time,
+			 work_windows_number,
+			 idle_windows_number)
+		  VALUES
+			(B.busi_status,
+			 B.branch_no,
+			 B.handle_county,
+			 B.handle_city,
+			 B.handle_province,
+			 B.wait_count,
+			 B.avg_wait_count_win,
+			 B.total_wait_time,
+			 B.avg_wait_time,
+			 B.max_wait_time,
+			 B.work_windows_number,
+			 B.idle_windows_number)
+	</update>
+
+	<!-- 插入机构繁忙度初始数据 -->
+	<insert id="insertBranchBusyData" parameterType="java.util.HashMap">
+	 INSERT INTO MAS_QUEUE_BRANCH_F
+               (busi_status, branch_no, handle_county, handle_city,
+                handle_province, wait_count, avg_wait_count_win,
+                total_wait_time, avg_wait_time, max_wait_time,
+                work_windows_number, idle_windows_number)
+		(SELECT CASE
+		           WHEN h.status IS NULL
+		              THEN '0'
+		           ELSE '1'
+		        END busi_status, f.orgid, f.address_county, f.address_city,
+		        f.address_province, NVL (wait_count, 0), NVL (wait_count_avg, 0),
+		        NVL (total_wait_time, 0), NVL (wait_time_avg, 0),
+		        NVL (max_wait_time, 0), NVL (open_win_count, 0),
+		        NVL (idle_windows_number, 0)
+		   FROM tl9_orgbasic f
+		        LEFT JOIN
+		        (SELECT a.branch_no, a.wait_count, a.max_wait_time, a.total_wait_time,
+		                b.open_win_count,
+		                b.win_count - b.open_win_count idle_windows_number,
+		                CASE
+		                   WHEN wait_count = 0
+		                      THEN 0
+		                   ELSE TRUNC (total_wait_time / wait_count)
+		                END wait_time_avg,
+		                CASE
+		                   WHEN open_win_count = 0
+		                      THEN 0
+		                   ELSE ROUND (wait_count / open_win_count)
+		                END wait_count_avg
+		           FROM (SELECT   COUNT (CASE
+		                                    WHEN queue_status = '0'
+		                                       THEN 1
+		                                    ELSE NULL
+		                                 END
+		                                ) wait_count,
+		                          MAX
+		                             (CASE
+		                                 WHEN queue_status = '0'
+		                                    THEN TRUNC (  (    (  SYSDATE
+		                                                        - DATE '1970-01-01'
+		                                                       )
+		                                                     * 24
+		                                                     * 60
+		                                                     * 60
+		                                                   - apply_time
+		                                                  )
+		                                                / 60
+		                                               )
+		                                 ELSE 0
+		                              END
+		                             ) max_wait_time,
+		                          TRUNC
+		                             (  SUM
+		                                   (CASE
+		                                       WHEN queue_status = '0'
+		                                          THEN (    (  SYSDATE
+		                                                     - DATE '1970-01-01'
+		                                                    )
+		                                                  * 24
+		                                                  * 60
+		                                                  * 60
+		                                                - apply_time
+		                                               )
+		                                       ELSE 0
+		                                    END
+		                                   )
+		                              / 60
+		                             ) total_wait_time,
+		                          branch_no
+		                     FROM MAS_QUEUE_BUSI_INFO
+		                 GROUP BY branch_no) a
+		                LEFT JOIN
+		                (SELECT   COUNT (CASE
+		                                    WHEN onoffsign = 1
+		                                       THEN 1
+		                                    ELSE NULL
+		                                 END
+		                                ) win_count,
+		                          COUNT (CASE
+		                                    WHEN window_status = 1
+		                                       THEN 1
+		                                    ELSE NULL
+		                                 END
+		                                ) open_win_count,
+		                          win_brch_no
+		                     FROM TL9_SM_BRANCH_WIN_BUSI_INFO
+		                 GROUP BY win_brch_no) b ON b.win_brch_no = a.branch_no
+		                ) e ON f.orgid = e.branch_no
+		        LEFT JOIN
+		        (SELECT a.branch_no, '1' status
+		           FROM tl9_qu_branch_time a, tl9_qu_work_calendar b
+		          WHERE a.branch_no = b.branch_no
+		            AND a.calender_type = b.calendar_type
+		            AND b.calendar_year = to_char(sysdate,'yyyy')
+		            AND b.calendar_month = to_char(sysdate,'mm')
+		            AND b.calendar_day = to_char(sysdate,'dd')
+		            AND a.work_open_time &lt; to_char(sysdate,'hh24:mi')
+		            AND a.work_close_time &gt; to_char(sysdate,'hh24:mi')) h ON h.branch_no = f.orgid
+		  WHERE (f.orglevelid = '3' OR f.orgtypeid = '1'))
+	</insert>
+
+	<!-- 更新机构繁忙度状态 -->
+	<update id="updateBranchBusyStatus" parameterType="java.util.HashMap">
+	UPDATE MAS_QUEUE_BRANCH_F a
+      SET (a.busi_status) =
+             (SELECT CASE
+                        WHEN NVL (e.avg_wait_time, 0) &lt;=
+                                 g.wait_time_idle_limit_data
+                        AND NVL (e.avg_wait_count_win, 0) &lt;=
+                                                 g.wait_people_idle_limit_data
+                           THEN '1'
+                        WHEN NVL (e.avg_wait_time, 0) &gt;
+                                              g.wait_time_idle_limit_data
+                        AND NVL (e.avg_wait_time, 0) &lt;=
+                                              g.wait_time_busy_limit_data
+                        AND NVL (e.avg_wait_count_win, 0) &lt;
+                                                 g.wait_people_busy_limit_data
+                           THEN '2'
+                        WHEN NVL (e.avg_wait_time, 0) &lt;
+                                              g.wait_time_busy_limit_data
+                        AND NVL (e.avg_wait_count_win, 0) &gt;
+                                                 g.wait_people_idle_limit_data
+                        AND NVL (e.avg_wait_count_win, 0) &lt;=
+                                                 g.wait_people_busy_limit_data
+                           THEN '2'
+                        WHEN NVL (e.avg_wait_time, 0) &gt;
+                                              g.wait_time_busy_limit_data
+                        AND NVL (e.avg_wait_count_win, 0) &lt;
+                                                 g.wait_people_busy_limit_data
+                           THEN '3'
+                        WHEN NVL (e.avg_wait_time, 0) &lt;
+                                              g.wait_time_busy_limit_data
+                        AND NVL (e.avg_wait_count_win, 0) &gt;
+                                                 g.wait_people_busy_limit_data
+                           THEN '3'
+                        ELSE '4'
+                     END busi_status
+                FROM MAS_QUEUE_BRANCH_F e, tl9_qu_monitor_param g
+               WHERE e.busi_status = '1'
+                 AND e.branch_no = a.branch_no)
+              where busi_status = '1'
+	</update>
+
+	<!-- 插入村镇繁忙度初始数据 -->
+	<insert id="insertCountyBusyData" parameterType="java.util.HashMap">
+	INSERT INTO mas_queue_county_f
+	            (handle_county, handle_city, handle_province, busi_status,
+	             wait_count, avg_wait_count_win, avg_wait_time, max_wait_time,
+	             branch_count, unopen_branch_count, idle_branch_count,
+	             normal_branch_count, busy_branch_count, warn_branch_count,
+	             max_wait_b_id, max_wait_b_name)
+	   SELECT a.handle_county, handle_city, handle_province,
+	          CASE GREATEST (idle_count,
+	                         nor_count,
+	                         busy_count,
+	                         warn_count
+	                        )
+	             WHEN 0
+	                THEN '0'
+	             WHEN warn_count
+	                THEN '4'
+	             WHEN busy_count
+	                THEN '3'
+	             WHEN nor_count
+	                THEN '2'
+	             WHEN idle_count
+	                THEN '1'
+	             ELSE '0'
+	          END busi_status,
+	          total_wait_count,
+	          CASE
+	             WHEN work_windows_number = 0
+	                THEN 0
+	             ELSE ROUND (total_wait_count / work_windows_number
+	                        )
+	          END avg_wait_count_win,
+	          CASE
+	             WHEN total_wait_count = 0
+	                THEN 0
+	             ELSE TRUNC (total_wait_time / total_wait_count)
+	          END avg_wait_time,
+	          max_wait_time, total_count, unopen_count, idle_count, nor_count,
+	          busy_count, warn_count, e.branch_no, e.orgname_cn
+	     FROM (SELECT   COUNT (1) total_count,
+	                    COUNT (CASE busi_status
+	                              WHEN '0'
+	                                 THEN 1
+	                              ELSE NULL
+	                           END) unopen_count,
+	                    COUNT (CASE busi_status
+	                              WHEN '1'
+	                                 THEN 1
+	                              ELSE NULL
+	                           END) idle_count,
+	                    COUNT (CASE busi_status
+	                              WHEN '2'
+	                                 THEN 1
+	                              ELSE NULL
+	                           END) nor_count,
+	                    COUNT (CASE busi_status
+	                              WHEN '3'
+	                                 THEN 1
+	                              ELSE NULL
+	                           END) busy_count,
+	                    COUNT (CASE busi_status
+	                              WHEN '4'
+	                                 THEN 1
+	                              ELSE NULL
+	                           END) warn_count,
+	                    SUM (total_wait_time) total_wait_time,
+	                    SUM (wait_count) total_wait_count,
+	                    SUM (work_windows_number) work_windows_number,
+	                    MAX (max_wait_time) max_wait_time, handle_county,
+	                    handle_city, handle_province
+	               FROM mas_queue_branch_f
+	           GROUP BY handle_county, handle_city, handle_province) a
+	          LEFT JOIN
+	          (SELECT c.branch_no, d.orgname_cn, c.handle_county
+	             FROM mas_queue_branch_f c LEFT JOIN tl9_orgbasic d
+	                  ON d.orgid = c.branch_no,
+	                  (SELECT handle_county, branch_no
+	                     FROM (SELECT ROW_NUMBER () OVER (PARTITION BY handle_county ORDER BY max_wait_time DESC,
+	                                   avg_wait_time DESC) r,
+	                                  a.handle_county, branch_no
+	                             FROM mas_queue_branch_f a
+	                            WHERE busi_status != '0')
+	                    WHERE r = 1) b
+	            WHERE c.handle_county = b.handle_county
+	              AND c.branch_no = b.branch_no
+	              AND c.busi_status != '0') e ON a.handle_county = e.handle_county
+	</insert>
+
+	<!-- 插入城市繁忙度初始数据 -->
+	<insert id="insertCityBusyData" parameterType="java.util.HashMap">
+	INSERT INTO mas_queue_CITY_f
+            (handle_city, handle_province, busi_status, wait_count,
+             avg_wait_count_win, avg_wait_time, max_wait_time, branch_count,
+             unopen_branch_count, idle_branch_count, normal_branch_count,
+             busy_branch_count, warn_branch_count, max_wait_b_id,
+             max_wait_b_name)
+   SELECT a.handle_city, handle_province,
+          CASE GREATEST (idle_count,
+                         nor_count,
+                         busy_count,
+                         warn_count
+                        )
+             WHEN 0
+                THEN '0'
+             WHEN warn_count
+                THEN '4'
+             WHEN busy_count
+                THEN '3'
+             WHEN nor_count
+                THEN '2'
+             WHEN idle_count
+                THEN '1'
+             ELSE '0'
+          END busi_status,
+          total_wait_count,
+          CASE
+             WHEN work_windows_number = 0
+                THEN 0
+             ELSE ROUND (total_wait_count / work_windows_number
+                        )
+          END avg_wait_count_win,
+          CASE
+             WHEN total_wait_count = 0
+                THEN 0
+             ELSE TRUNC (total_wait_time / total_wait_count)
+          END avg_wait_time,
+          max_wait_time, total_count, unopen_count, idle_count, nor_count,
+          busy_count, warn_count, e.branch_no, e.orgname_cn
+     FROM (SELECT   COUNT (1) total_count,
+                    COUNT (CASE busi_status
+                              WHEN '0'
+                                 THEN 1
+                              ELSE NULL
+                           END) unopen_count,
+                    COUNT (CASE busi_status
+                              WHEN '1'
+                                 THEN 1
+                              ELSE NULL
+                           END) idle_count,
+                    COUNT (CASE busi_status
+                              WHEN '2'
+                                 THEN 1
+                              ELSE NULL
+                           END) nor_count,
+                    COUNT (CASE busi_status
+                              WHEN '3'
+                                 THEN 1
+                              ELSE NULL
+                           END) busy_count,
+                    COUNT (CASE busi_status
+                              WHEN '4'
+                                 THEN 1
+                              ELSE NULL
+                           END) warn_count,
+                    SUM (total_wait_time) total_wait_time,
+                    SUM (wait_count) total_wait_count,
+                    SUM (work_windows_number) work_windows_number,
+                    MAX (max_wait_time) max_wait_time, handle_city,
+                    handle_province
+               FROM mas_queue_branch_f
+           GROUP BY handle_city, handle_province) a
+          LEFT JOIN
+          (SELECT c.branch_no, d.orgname_cn, c.handle_city
+             FROM mas_queue_branch_f c LEFT JOIN tl9_orgbasic d
+                  ON d.orgid = c.branch_no
+                  ,
+                  (SELECT handle_city, branch_no
+                     FROM (SELECT ROW_NUMBER () OVER (PARTITION BY handle_city ORDER BY max_wait_time DESC,
+                                   avg_wait_time DESC) r,
+                                  a.handle_city, branch_no
+                             FROM mas_queue_branch_f a
+                            WHERE busi_status != '0')
+                    WHERE r = 1) b
+            WHERE c.handle_city = b.handle_city
+              AND c.branch_no = b.branch_no
+              AND c.busi_status != '0') e ON a.handle_city = e.handle_city
+	</insert>
+
+	<!-- 更新城市繁忙度状态 -->
+	<update id="updateCityBusyStatus" parameterType="java.util.HashMap">
+	UPDATE mas_queue_city_f a
+   	SET (county_count, unopen_county_count, idle_county_count,
+        normal_county_count, busy_county_count, warn_county_count) =
+          (SELECT county_count, unopen_county_count, idle_county_count,
+                  normal_county_count, busy_county_count, warn_county_count
+             FROM (SELECT   COUNT (1) county_count,
+                            COUNT
+                               (CASE
+                                   WHEN busi_status = '0'
+                                      THEN 1
+                                   ELSE NULL
+                                END
+                               ) unopen_county_count,
+                            COUNT
+                                 (CASE
+                                     WHEN busi_status = '1'
+                                        THEN 1
+                                     ELSE NULL
+                                  END
+                                 ) idle_county_count,
+                            COUNT
+                               (CASE
+                                   WHEN busi_status = '2'
+                                      THEN 1
+                                   ELSE NULL
+                                END
+                               ) normal_county_count,
+                            COUNT
+                                 (CASE
+                                     WHEN busi_status = '3'
+                                        THEN 1
+                                     ELSE NULL
+                                  END
+                                 ) busy_county_count,
+                            COUNT
+                                 (CASE
+                                     WHEN busi_status = '4'
+                                        THEN 1
+                                     ELSE NULL
+                                  END
+                                 ) warn_county_count,
+                            handle_city
+                       FROM mas_queue_county_f
+                   GROUP BY handle_city) b
+            WHERE b.handle_city = a.handle_city)
+	</update>
+
+	<!-- 插入省繁忙度初始数据 -->
+	<insert id="insertProvinceBusyData" parameterType="java.util.HashMap">
+	INSERT INTO mas_queue_province_f
+            (handle_province, busi_status, wait_count, avg_wait_count_win,
+             avg_wait_time, max_wait_time, branch_count, unopen_branch_count,
+             idle_branch_count, normal_branch_count, busy_branch_count,
+             warn_branch_count, max_wait_b_id, max_wait_b_name)
+   SELECT a.handle_province,
+          CASE GREATEST (idle_count,
+                         nor_count,
+                         busy_count,
+                         warn_count
+                        )
+             WHEN 0
+                THEN '0'
+             WHEN warn_count
+                THEN '4'
+             WHEN busy_count
+                THEN '3'
+             WHEN nor_count
+                THEN '2'
+             WHEN idle_count
+                THEN '1'
+             ELSE '0'
+          END busi_status,
+          total_wait_count,
+          CASE
+             WHEN work_windows_number = 0
+                THEN 0
+             ELSE ROUND (total_wait_count / work_windows_number
+                        )
+          END avg_wait_count_win,
+          CASE
+             WHEN total_wait_count = 0
+                THEN 0
+             ELSE TRUNC (total_wait_time / total_wait_count)
+          END avg_wait_time,
+          max_wait_time, total_count, unopen_count, idle_count, nor_count,
+          busy_count, warn_count, e.branch_no, e.orgname_cn
+     FROM (SELECT   COUNT (1) total_count,
+                    COUNT (CASE busi_status
+                              WHEN '0'
+                                 THEN 1
+                              ELSE NULL
+                           END) unopen_count,
+                    COUNT (CASE busi_status
+                              WHEN '1'
+                                 THEN 1
+                              ELSE NULL
+                           END) idle_count,
+                    COUNT (CASE busi_status
+                              WHEN '2'
+                                 THEN 1
+                              ELSE NULL
+                           END) nor_count,
+                    COUNT (CASE busi_status
+                              WHEN '3'
+                                 THEN 1
+                              ELSE NULL
+                           END) busy_count,
+                    COUNT (CASE busi_status
+                              WHEN '4'
+                                 THEN 1
+                              ELSE NULL
+                           END) warn_count,
+                    SUM (total_wait_time) total_wait_time,
+                    SUM (wait_count) total_wait_count,
+                    SUM (work_windows_number) work_windows_number,
+                    MAX (max_wait_time) max_wait_time, handle_province
+               FROM mas_queue_branch_f
+           GROUP BY handle_province) a
+          LEFT JOIN
+          (SELECT c.branch_no, d.orgname_cn, c.handle_province
+             FROM mas_queue_branch_f c LEFT JOIN tl9_orgbasic d
+                  ON d.orgid = c.branch_no
+                  ,
+                  (SELECT handle_province, branch_no
+                     FROM (SELECT ROW_NUMBER () OVER (PARTITION BY handle_province ORDER BY max_wait_time DESC,
+                                   avg_wait_time DESC) r,
+                                  a.handle_province, branch_no
+                             FROM mas_queue_branch_f a
+                            WHERE busi_status != '0')
+                    WHERE r = 1) b
+            WHERE c.handle_province = b.handle_province
+              AND c.branch_no = b.branch_no
+              AND c.busi_status != '0') e
+          ON a.handle_province = e.handle_province
+	</insert>
+
+	<!-- 更新省繁忙度状态 -->
+	<update id="updateProvinceBusyStatus" parameterType="java.util.HashMap">
+	UPDATE mas_queue_province_f a
+   SET (city_count, unopen_city_count, idle_city_count, normal_city_count,
+        busy_city_count, warn_city_count) =
+          (SELECT city_count, unopen_city_count, idle_city_count,
+                  normal_city_count, busy_city_count, warn_city_count
+             FROM (SELECT   COUNT (1) city_count,
+                            COUNT
+                                 (CASE
+                                     WHEN busi_status = '0'
+                                        THEN 1
+                                     ELSE NULL
+                                  END
+                                 ) unopen_city_count,
+                            COUNT (CASE
+                                      WHEN busi_status = '1'
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) idle_city_count,
+                            COUNT
+                                 (CASE
+                                     WHEN busi_status = '2'
+                                        THEN 1
+                                     ELSE NULL
+                                  END
+                                 ) normal_city_count,
+                            COUNT (CASE
+                                      WHEN busi_status = '3'
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) busy_city_count,
+                            COUNT (CASE
+                                      WHEN busi_status = '4'
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) warn_city_count,
+                            handle_province
+                       FROM mas_queue_city_f
+                   GROUP BY handle_province) b
+            WHERE b.handle_province = a.handle_province)
+	</update>
+
+	<!-- 插入国家繁忙度初始数据 -->
+	<insert id="insertCountryBusyData" parameterType="java.util.HashMap">
+	INSERT INTO mas_queue_country_f
+            (wait_count, avg_wait_count_win, avg_wait_time, max_wait_time,
+             branch_count, unopen_branch_count, idle_branch_count,
+             normal_branch_count, busy_branch_count, warn_branch_count,
+             max_wait_b_id, max_wait_b_name)
+   	SELECT total_wait_count,
+          CASE
+             WHEN work_windows_number = 0
+                THEN 0
+             ELSE ROUND (total_wait_count / work_windows_number
+                        )
+          END avg_wait_count_win,
+          CASE
+             WHEN total_wait_count = 0
+                THEN 0
+             ELSE TRUNC (total_wait_time / total_wait_count)
+          END avg_wait_time,
+          max_wait_time, total_count, unopen_count, idle_count, nor_count,
+          busy_count, warn_count, e.branch_no, e.orgname_cn
+     FROM (SELECT COUNT (1) total_count,
+                  COUNT (CASE busi_status
+                            WHEN '0'
+                               THEN 1
+                            ELSE NULL
+                         END) unopen_count,
+                  COUNT (CASE busi_status
+                            WHEN '1'
+                               THEN 1
+                            ELSE NULL
+                         END) idle_count,
+                  COUNT (CASE busi_status
+                            WHEN '2'
+                               THEN 1
+                            ELSE NULL
+                         END) nor_count,
+                  COUNT (CASE busi_status
+                            WHEN '3'
+                               THEN 1
+                            ELSE NULL
+                         END) busy_count,
+                  COUNT (CASE busi_status
+                            WHEN '4'
+                               THEN 1
+                            ELSE NULL
+                         END) warn_count,
+                  SUM (total_wait_time) total_wait_time,
+                  SUM (wait_count) total_wait_count,
+                  SUM (work_windows_number) work_windows_number,
+                  MAX (max_wait_time) max_wait_time
+             FROM mas_queue_branch_f) a
+          LEFT JOIN
+          (SELECT c.branch_no, d.orgname_cn
+             FROM mas_queue_branch_f c LEFT JOIN tl9_orgbasic d
+                  ON d.orgid = c.branch_no
+                  ,
+                  (SELECT branch_no
+                     FROM (SELECT ROW_NUMBER () OVER (ORDER BY max_wait_time DESC,
+                                   avg_wait_time DESC) r,
+                                  branch_no
+                             FROM mas_queue_branch_f a
+                            WHERE busi_status != '0')
+                    WHERE r = 1) b
+            WHERE c.branch_no = b.branch_no AND c.busi_status != '0') e ON 1 =
+                                                                             1
+	</insert>
+
+	<!-- 更新国家繁忙度状态 -->
+	<update id="updateCountryBusyStatus" parameterType="java.util.HashMap">
+	UPDATE mas_queue_country_f a
+   	SET (province_count, unopen_province_count, idle_province_count,
+        normal_province_count, busy_province_count, warn_province_count) =
+          (SELECT COUNT (1) province_count,
+                  COUNT (CASE
+                            WHEN busi_status = '0'
+                               THEN 1
+                            ELSE NULL
+                         END
+                        ) unopen_province_count,
+                  COUNT (CASE
+                            WHEN busi_status = '1'
+                               THEN 1
+                            ELSE NULL
+                         END
+                        ) idle_province_count,
+                  COUNT (CASE
+                            WHEN busi_status = '2'
+                               THEN 1
+                            ELSE NULL
+                         END
+                        ) normal_province_count,
+                  COUNT (CASE
+                            WHEN busi_status = '3'
+                               THEN 1
+                            ELSE NULL
+                         END
+                        ) busy_province_count,
+                  COUNT (CASE
+                            WHEN busi_status = '4'
+                               THEN 1
+                            ELSE NULL
+                         END
+                        ) warn_province_count
+             FROM mas_queue_province_f)
+	</update>
+
+
+	<!-- 删除机构服务质量数据 -->
+	<delete id="clearBranchQualData">
+		TRUNCATE TABLE MAS_QUEUE_BRANCH_Q
+	</delete>
+
+	<!-- 删除村镇服务质量数据 -->
+	<delete id="clearCountyQualData">
+		TRUNCATE TABLE MAS_QUEUE_COUNTY_Q
+	</delete>
+
+	<!-- 删除城市服务质量数据 -->
+	<delete id="clearCityQualData">
+		TRUNCATE TABLE MAS_QUEUE_CITY_Q
+	</delete>
+
+	<!-- 删除省服务质量数据 -->
+	<delete id="clearProvinceQualData">
+		TRUNCATE TABLE MAS_QUEUE_PROVINCE_Q
+	</delete>
+
+	<!-- 删除国家服务质量数据 -->
+	<delete id="clearCountryQualData">
+		TRUNCATE TABLE MAS_QUEUE_COUNTRY_Q
+	</delete>
+
+	<!-- 插入机构服务质量初始数据 -->
+	<insert id="insertBranchQualData" parameterType="java.util.HashMap">
+	 INSERT INTO MAS_QUEUE_BRANCH_Q
+               (branch_no, handle_county, handle_city, handle_province,
+                quality_status, total, receive_count, customer_id_count,
+                evaluate_invite_count, evaluate_count, evaluate_good_count,
+                evaluate_bad_count)
+      SELECT e.branch_no, address_county, address_city,
+             address_province,
+             CASE
+                WHEN service_quat_number &gt;= uplimit
+                   THEN '4'
+                WHEN service_quat_number &lt; uplimit
+                AND service_quat_number &gt;= midlimit
+                   THEN '3'
+                WHEN service_quat_number &lt; midlimit
+                AND service_quat_number &gt;= lowlimit
+                   THEN '2'
+                ELSE '1'
+             END quality_status,
+             total, receive_count, customer_id_count, evaluate_invite_count,
+             evaluate_count, evaluate_good_count, evaluate_bad_count
+        FROM (SELECT a.orgid branch_no, a.address_county, a.address_city,
+                     a.address_province,
+                     ROUND
+                        (  CASE NVL (b.receive_count, 0)
+                              WHEN 0
+                                 THEN 0
+                              ELSE   NVL (b.evaluate_invite_count, 0)
+                                   / b.receive_count
+                                   * NVL (d.evaluate_invite_weight, 0)
+                           END
+                         + CASE NVL (b.evaluate_invite_count, 0)
+                              WHEN 0
+                                 THEN 0
+                              ELSE   NVL (b.evaluate_count, 0)
+                                   / b.evaluate_invite_count
+                                   * NVL (d.evaluate_weight, 0)
+                           END
+                         + CASE NVL (b.evaluate_count, 0)
+                              WHEN 0
+                                 THEN 0
+                              ELSE   NVL (b.evaluate_good_count, 0)
+                                   / b.evaluate_count
+                                   * NVL (d.evaluate_good_weight, 0)
+                           END
+                         + CASE NVL (b.total, 0)
+                              WHEN 0
+                                 THEN 0
+                              ELSE   NVL (c.customer_id_count, 0)
+                                   / b.total
+                                   * NVL (d.customer_recognition_weight, 0)
+                           END,
+                         2
+                        ) service_quat_number,
+                     d.quality_up_limit_data uplimit,
+                     d.quality_mid_limit_data midlimit,
+                     d.quality_low_limit_data lowlimit, NVL (b.total,
+                                                             0) total,
+                     NVL (b.receive_count, 0) receive_count,
+                     NVL (c.customer_id_count, 0) customer_id_count,
+                     NVL (b.evaluate_invite_count, 0) evaluate_invite_count,
+                     NVL (b.evaluate_count, 0) evaluate_count,
+                     NVL (b.evaluate_good_count, 0) evaluate_good_count,
+                     NVL (b.evaluate_bad_count, 0) evaluate_bad_count
+                FROM tl9_orgbasic a
+                     LEFT JOIN
+                     (SELECT   COUNT (DISTINCT ticket_info) total,
+                               COUNT
+                                  (CASE
+                                      WHEN queue_status = '2'
+                                      AND valid_flag is null
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) receive_count,
+                               COUNT
+                                  (CASE
+                                      WHEN evaluate_flag = '1'
+                                      AND valid_flag is null
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) evaluate_invite_count,
+                               COUNT
+                                  (CASE
+                                      WHEN queue_status = '2'
+                                      AND valid_flag is null AND evaluate IS NOT NULL
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) evaluate_count,
+                               COUNT
+                                  (CASE
+                                      WHEN queue_status = '2'
+                                      AND valid_flag is null  AND evaluate = '1'
+                                         THEN 1
+                                      ELSE NULL
+                                   END
+                                  ) evaluate_good_count,
+                               COUNT
+                                   (CASE
+                                       WHEN  queue_status = '2'
+                                      AND valid_flag is null AND evaluate = '3'
+                                          THEN 1
+                                       ELSE NULL
+                                    END
+                                   ) evaluate_bad_count,
+                               branch_no
+                          FROM MAS_QUEUE_BUSI_INFO
+                      GROUP BY branch_no) b ON a.orgid = b.branch_no
+                     LEFT JOIN
+                     (SELECT   COUNT (customer_id) customer_id_count,
+                               branch_no
+                          FROM MAS_QUEUE_BUSI_INFO
+                         WHERE customer_id IS NOT NULL
+                      GROUP BY branch_no) c ON a.orgid = c.branch_no
+                     LEFT JOIN tl9_qu_monitor_param d ON 1=1
+               WHERE (a.orglevelid = '3' or a.ORGTYPEID = '1')) e
+	</insert>
+
+	<!-- 插入区域服务质量初始数据 -->
+	<insert id="insertCountyQualData" parameterType="java.util.HashMap">
+	  INSERT INTO MAS_QUEUE_COUNTY_Q
+               ( handle_county, handle_city, handle_province,
+               QUALITY_STATUS,TOTAL,RECEIVE_COUNT,CUSTOMER_ID_COUNT,EVALUATE_INVITE_COUNT,
+               EVALUATE_COUNT,EVALUATE_GOOD_COUNT,EVALUATE_BAD_COUNT,BRANCH_COUNT,
+               BAD_BRANCH_COUNT,MID_BRANCH_COUNT,NICE_BRANCH_COUNT,GOOD_BRANCH_COUNT)
+      SELECT a.handle_county, handle_city, handle_province,
+             CASE GREATEST (bad_count,
+                            mid_count,
+                            nice_count,
+                            good_count
+                           )
+                WHEN good_count
+                   THEN '4'
+                WHEN nice_count
+                   THEN '3'
+                WHEN mid_count
+                   THEN '2'
+                WHEN bad_count
+                   THEN '1'
+                ELSE '0'
+             END QUALITY_STATUS,
+             total,RECEIVE_COUNT,CUSTOMER_ID_COUNT,EVALUATE_INVITE_COUNT,EVALUATE_COUNT,EVALUATE_GOOD_COUNT,EVALUATE_BAD_COUNT,
+             total_count, bad_count,mid_count,nice_count,good_count
+        FROM (SELECT   COUNT (1) total_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '1'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) bad_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '2'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) mid_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '3'
+                                    THEN 1
+                                 ELSE NULL
+                              END) nice_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '4'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) good_count,
+                       SUM (total) total,
+                       SUM (RECEIVE_COUNT) RECEIVE_COUNT,
+                       SUM (CUSTOMER_ID_COUNT) CUSTOMER_ID_COUNT,
+                       SUM (EVALUATE_COUNT) EVALUATE_COUNT,
+                       SUM (EVALUATE_INVITE_COUNT) EVALUATE_INVITE_COUNT,
+                       SUM (EVALUATE_GOOD_COUNT) EVALUATE_GOOD_COUNT,
+                       SUM (EVALUATE_BAD_COUNT) EVALUATE_BAD_COUNT,handle_county,
+                       handle_city, handle_province
+                  FROM MAS_QUEUE_BRANCH_Q
+              GROUP BY handle_county, handle_city, handle_province) a
+	</insert>
+
+
+	<!-- 插入市服务质量初始数据 -->
+	<insert id="insertCityQualData" parameterType="java.util.HashMap">
+	INSERT INTO mas_queue_city_q
+            (handle_city, handle_province, quality_status, total,
+             receive_count, customer_id_count, evaluate_invite_count,
+             evaluate_count, evaluate_good_count, evaluate_bad_count,
+             county_count, bad_county_count, mid_county_count,
+             nice_county_count, good_county_count, branch_count,
+             bad_branch_count, mid_branch_count, nice_branch_count,
+             good_branch_count)
+   SELECT handle_city, handle_province,
+          CASE GREATEST (bad_count,
+                         mid_count,
+                         nice_count,
+                         good_count
+                        )
+             WHEN good_count
+                THEN '4'
+             WHEN nice_count
+                THEN '3'
+             WHEN mid_count
+                THEN '2'
+             WHEN bad_count
+                THEN '1'
+             ELSE '0'
+          END quality_status,
+          total, receive_count, customer_id_count, evaluate_invite_count,
+          evaluate_count, evaluate_good_count, evaluate_bad_count,
+          total_count, bad_count, mid_count, nice_count, good_count,
+          branch_count, bad_branch_count, mid_branch_count, nice_branch_count,
+          good_branch_count
+     FROM (SELECT   COUNT (1) total_count,
+                    COUNT (CASE quality_status
+                              WHEN '1'
+                                 THEN 1
+                              ELSE NULL
+                           END) bad_count,
+                    COUNT (CASE quality_status
+                              WHEN '2'
+                                 THEN 1
+                              ELSE NULL
+                           END) mid_count,
+                    COUNT (CASE quality_status
+                              WHEN '3'
+                                 THEN 1
+                              ELSE NULL
+                           END
+                          ) nice_count,
+                    COUNT (CASE quality_status
+                              WHEN '4'
+                                 THEN 1
+                              ELSE NULL
+                           END
+                          ) good_count,
+                    SUM (total) total, SUM (receive_count) receive_count,
+                    SUM (customer_id_count) customer_id_count,
+                    SUM (evaluate_count) evaluate_count,
+                    SUM (evaluate_invite_count) evaluate_invite_count,
+                    SUM (evaluate_good_count) evaluate_good_count,
+                    SUM (evaluate_bad_count) evaluate_bad_count,
+                    SUM (branch_count) branch_count,
+                    SUM (bad_branch_count) bad_branch_count,
+                    SUM (mid_branch_count) mid_branch_count,
+                    SUM (nice_branch_count) nice_branch_count,
+                    SUM (good_branch_count) good_branch_count, handle_city,
+                    handle_province
+               FROM mas_queue_county_q
+           GROUP BY handle_city, handle_province) a
+	</insert>
+
+	<!-- 插入省服务质量初始数据 -->
+	<insert id="insertProvinceQualData" parameterType="java.util.HashMap">
+	INSERT INTO mas_queue_province_q
+               (handle_province,
+               QUALITY_STATUS,TOTAL,RECEIVE_COUNT,CUSTOMER_ID_COUNT,EVALUATE_INVITE_COUNT,
+               EVALUATE_COUNT,EVALUATE_GOOD_COUNT,EVALUATE_BAD_COUNT,city_COUNT,
+               BAD_city_COUNT,MID_city_COUNT,NICE_city_COUNT,GOOD_city_COUNT)
+      SELECT handle_province,
+             CASE GREATEST (bad_count,
+                            mid_count,
+                            nice_count,
+                            good_count
+                           )
+                WHEN good_count
+                   THEN '4'
+                WHEN nice_count
+                   THEN '3'
+                WHEN mid_count
+                   THEN '2'
+                WHEN bad_count
+                   THEN '1'
+                ELSE '0'
+             END QUALITY_STATUS,
+             total,RECEIVE_COUNT,CUSTOMER_ID_COUNT,EVALUATE_INVITE_COUNT,EVALUATE_COUNT,EVALUATE_GOOD_COUNT,EVALUATE_BAD_COUNT,
+             total_count, bad_count,mid_count,nice_count,good_count
+        FROM (SELECT   COUNT (1) total_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '1'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) bad_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '2'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) mid_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '3'
+                                    THEN 1
+                                 ELSE NULL
+                              END) nice_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '4'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) good_count,
+                       SUM (total) total,
+                       SUM (RECEIVE_COUNT) RECEIVE_COUNT,
+                       SUM (CUSTOMER_ID_COUNT) CUSTOMER_ID_COUNT,
+                       SUM (EVALUATE_COUNT) EVALUATE_COUNT,
+                       SUM (EVALUATE_INVITE_COUNT) EVALUATE_INVITE_COUNT,
+                       SUM (EVALUATE_GOOD_COUNT) EVALUATE_GOOD_COUNT,
+                       SUM (EVALUATE_BAD_COUNT) EVALUATE_BAD_COUNT,
+                       handle_province
+                  FROM mas_queue_city_q
+              GROUP BY handle_province) a
+	</insert>
+
+	<!-- 插入全国服务质量初始数据 -->
+	<insert id="insertCountryQualData" parameterType="java.util.HashMap">
+	 INSERT INTO mas_queue_country_q
+               (TOTAL,RECEIVE_COUNT,CUSTOMER_ID_COUNT,EVALUATE_INVITE_COUNT,
+               EVALUATE_COUNT,EVALUATE_GOOD_COUNT,EVALUATE_BAD_COUNT,province_COUNT,
+               BAD_province_COUNT,MID_province_COUNT,NICE_province_COUNT,GOOD_province_COUNT)
+      SELECT
+             total,RECEIVE_COUNT,CUSTOMER_ID_COUNT,EVALUATE_INVITE_COUNT,EVALUATE_COUNT,EVALUATE_GOOD_COUNT,EVALUATE_BAD_COUNT,
+             total_count, bad_count,mid_count,nice_count,good_count
+        FROM (SELECT   COUNT (1) total_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '1'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) bad_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '2'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) mid_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '3'
+                                    THEN 1
+                                 ELSE NULL
+                              END) nice_count,
+                       COUNT (CASE QUALITY_STATUS
+                                 WHEN '4'
+                                    THEN 1
+                                 ELSE NULL
+                              END
+                             ) good_count,
+                       SUM (total) total,
+                       SUM (RECEIVE_COUNT) RECEIVE_COUNT,
+                       SUM (CUSTOMER_ID_COUNT) CUSTOMER_ID_COUNT,
+                       SUM (EVALUATE_COUNT) EVALUATE_COUNT,
+                       SUM (EVALUATE_INVITE_COUNT) EVALUATE_INVITE_COUNT,
+                       SUM (EVALUATE_GOOD_COUNT) EVALUATE_GOOD_COUNT,
+                       SUM (EVALUATE_BAD_COUNT) EVALUATE_BAD_COUNT
+                  FROM mas_queue_province_q) a
+	</insert>
+
+
+</mapper>

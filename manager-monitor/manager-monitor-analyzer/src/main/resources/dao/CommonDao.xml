@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.CommonDao">
+	<parameterMap type="java.util.Map" id="countMap">
+         <parameter property="M_KEY" mode="IN" jdbcType="VARCHAR"/>
+         <parameter property="M_TYPE" mode="IN" jdbcType="VARCHAR"/>
+         <parameter property="M_VALUE" mode="IN" jdbcType="VARCHAR"/>
+         <parameter property="CCOUNT" mode="IN" jdbcType="INTEGER"/>
+         <parameter property="RESULT" mode="OUT" jdbcType="INTEGER"/>
+    </parameterMap>
+	<select id="computeRepeatCount" parameterMap="countMap" statementType="CALLABLE">
+		CALL mas_computeRepeatCount(?,?,?,?,?)
+	</select>
+</mapper>

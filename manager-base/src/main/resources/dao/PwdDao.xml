@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.base.dao.PwdDao">
+    <resultMap id="base_result_map" type="com.dcfs.smartaibank.manager.base.domain.MediumInfo">
+        <result property="id" column="USERID"/>
+        <result property="mediumType" column="MEDIUMTYPEID"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="mediumInfo" column="MEDIUMINFO"/>
+        <result property="mediumInfoUpdateTime" column="MEDIUMINFOUPDATETIME"/>
+        <result property="errorNum" column="ERRORNUM"/>
+        <result property="status" column="STATUS"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="mediumInfoLockTime" column="MEDIUMINFOLOCKTIME"/>
+        <result property="systemId" column="SYSTEMID"/>
+        <result property="mediumInfo" column="MEDIUMINFO"/>
+    </resultMap>
+    <sql id="base_where_list">
+           where t.userid=#{id}
+            and t.MEDIUMTYPEID=#{mediumType,typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+    </sql>
+    <select id="selectOne" parameterType="com.dcfs.smartaibank.manager.base.domain.MediumInfo" resultMap="base_result_map">
+        select t.MEDIUMINFO,t.STATUS from
+            Tl9_Usermedium t
+            <include refid="base_where_list"/>
+            and t.STATUS=#{status,typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+    </select>
+
+    <select id="getUserName" parameterType="java.lang.String" resultType="java.lang.String">
+          select
+          userName
+          from Tl9_Userbasic t
+          where t.userId=#{id}
+    </select>
+    <select id="checkOrgLevel" parameterType="java.lang.String" resultType="java.lang.String">
+        select t.orglevelid f
+        rom tl9_orgbasic t
+        where t.orgid=#{orgId};
+    </select>
+    <select id="checkOrgUser" parameterType="java.lang.String" resultType="java.lang.String">
+        select t.userId
+        from Tl9_Userbasic t
+        where t.userid=#{id}
+        and t.orgid in
+    (select t.orgid from tl9_orgbasic t where t.orgid=#{orgId}
+    union
+    select t.orgid from tl9_orgbasic t where t.business_superior=#{orgId} and t.orgtypeid in ('3','5'))
+    </select>
+    <update id="updateByPrimaryKey" parameterType="com.dcfs.smartaibank.manager.base.domain.MediumInfo">
+          update Tl9_Usermedium t
+          SET t.MEDIUMINFO=#{mediumInfo},
+              t.MEDIUMINFOUPDATETIME=#{mediumInfoUpdateTime}
+        <include refid="base_where_list"/>
+    </update>
+
+
+    <update id="resetPwd" parameterType="com.dcfs.smartaibank.manager.base.domain.MediumInfo">
+        update Tl9_Usermedium t
+        set t.STATUS=#{status,typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+            t.MEDIUMINFOLOCKTIME=#{mediumInfoLockTime},
+            t.MEDIUMINFO=#{mediumInfo},
+            t.MEDIUMINFOUPDATETIME=#{mediumInfoUpdateTime}
+        <include refid="base_where_list"/>
+    </update>
+
+    <update id="lockPwd" parameterType="com.dcfs.smartaibank.manager.base.domain.MediumInfo">
+        update Tl9_Usermedium t
+        set t.STATUS=#{status,typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+            t.MEDIUMINFOLOCKTIME=#{mediumInfoLockTime}
+        <include refid="base_where_list"/>
+    </update>
+</mapper>

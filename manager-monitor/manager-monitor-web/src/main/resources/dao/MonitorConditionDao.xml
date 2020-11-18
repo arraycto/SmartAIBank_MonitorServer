@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.MonitorConditionDao">
+
+
+    <select id="queryDevModelInfo" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+        select a.DEVMODELKEY as "devModelId",a.DEVMODELNAME as "devModelName" from TL9_DEVICE_MODEL a
+        <if test="id !='' and  id !=null">
+            ,TL9_DEVICE_MODEL_CLASS b
+            WHERE a.DEVMODELKEY = b.DEVMODELKEY
+            AND b.DEVCLASSKEY = #{id}
+        </if>
+    </select>
+
+    <select id="queryDevTypeInfo" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+            <!--
+          select MCLASSKEY as "devClassKey",MCLASSNAME as "devClassName" from MAS_MCLASS_MONITOR
+            where active = 1
+            order by MCLASSKEY desc
+            -->
+             select MCLASSKEY as "devClassKey",
+                 CASE  MCLASSKEY
+                 WHEN '130000' THEN '自助终端机'
+                 ELSE MCLASSNAME
+                END AS "devClassName"
+                from MAS_MCLASS_MONITOR
+            where active = 1
+            order by MCLASSKEY desc
+    </select>
+
+    <select id="queryBranchInfo" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+            SELECT ORGID as "branchNo",
+                   ORGNAME_CN as "branchName"
+            FROM TL9_ORGBASIC
+            where ORGSTATUSTYPEID != '0'
+            start with ORGID = #{branchNo}
+            connect by  prior ORGID = BUSINESS_SUPERIOR
+    </select>
+
+    <select id="queryManufacturer" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+        select m.MANUFACTURERID as "manufacturerId",m.NAME as "name"
+        from TL9_DEVICE_MANUFACTURER m
+        <if test="devId != null and devId !=''">
+            <choose>
+                <when test="devModelId !=null and devModelId !=''">
+                    left join TL9_DEVICE_MODEL t
+                    on t.manufacturerid = m.manufacturerid
+                    where t.devmodelid = #{devModelId}
+                </when>
+                <otherwise>
+                    left join TL9_DEVICE_MODEL t
+                    on t.manufacturerid = m.manufacturerid
+                    left join TL9_DEVICE_MODEL_CLASS c
+                    on t.DEVMODELKEY = c.DEVMODELKEY
+                    where c.DEVCLASSKEY=#{devId}
+                </otherwise>
+            </choose>
+        </if>
+    </select>
+
+    <!-- modify by wangjzm ,查询语句不正确 -->
+    <select id="getDevClass" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.MonitorRemoteDevice">
+        SELECT T1.DEVCLASSKEY,T1.DEVCLASSNAME
+          FROM tl9_device_class t1,
+               tl9_device_model_class t2,
+               tl9_device_model t3,
+               tl9_terminal_device_bind t4,
+               tl9_terminal_mac t5
+         WHERE     T1.DEVCLASSKEY = T2.DEVCLASSKEY
+               AND T2.DEVMODELKEY = T3.DEVMODELKEY
+               AND T3.DEVMODELKEY = T4.DEVMODELKEY
+               AND T4.TERMINALID = T5.TERMINALID
+               AND T5.TERMINALID = #{deviceId}
+    </select>
+
+    <select id="getRecordOrgInfo" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+            SELECT ORGID as "branchNo",
+                   ORGNAME_CN as "branchName"
+            FROM TL9_ORGBASIC
+            where ORGSTATUSTYPEID != '0' and ORGTYPEID in ('1','5')
+            start with ORGID = #{branchNo}
+            connect by  prior ORGID = BUSINESS_SUPERIOR
+    </select>
+
+    <select id="getDeviceInfo" parameterType="java.lang.String"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlterNativeInfo">
+            SELECT DEVICEID as "deviceId"
+            FROM TL9_SM_BRANCH_DEVICE
+            where BRANCH_NO = #{branchNo} and DEVCLASSKEY = #{classKey}
+    </select>
+</mapper>

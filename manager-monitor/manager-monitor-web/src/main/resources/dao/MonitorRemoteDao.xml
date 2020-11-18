@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.MonitorRemoteDao">
+    <!--从数据库获取请求的序列，用于标示某一次的请求-->
+    <select id="getRemoteOrder" resultType="java.lang.String">
+        SELECT
+            lpad( TL9_QU_REMOTE_CONTROL_LOG_SEQ.nextval, 30, '0' ) AS SEQ
+        FROM
+            DUAL
+    </select>
+
+    <insert id="insertLog" parameterType="com.dcfs.smartaibank.manager.monitor.web.domian.RemoteControlLog">
+		INSERT INTO
+            TL9_QU_REMOTE_CONTROL_LOG
+            (
+            SEQ,
+            ORGID,
+            MAC,
+            USERID,
+            CONTROLMSG,
+            BEGIN_DATE,
+            BEGIN_TIME,
+            STATUS
+            )
+            VALUES
+            (
+            #{seq},
+            #{orgId},
+            #{mac},
+            #{userId},
+            #{controlMsg},
+            #{beginDate},
+            #{beginTime},
+            #{status}
+            )
+	</insert>
+
+    <update id="updateLog" parameterType="com.dcfs.smartaibank.manager.monitor.web.domian.RemoteControlLog">
+        UPDATE TL9_QU_REMOTE_CONTROL_LOG
+        <set>
+            <if test="status == 4 || status == 5 ">
+                FINISH_DATE=#{beginDate},FINISH_TIME=#{beginTime},STATUS=#{status},
+            </if>
+            <if test="status == 2">
+                RECEIVE_DATE=#{beginDate},RECEIVE_TIME=#{beginTime},STATUS=#{status},
+            </if>
+        </set>
+        WHERE SEQ=#{seq}
+    </update>
+</mapper>

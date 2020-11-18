@@ -1,0 +1,144 @@
+<configuration>
+
+    <!-- 从高到地低 OFF 、 FATAL 、 ERROR 、 WARN 、 INFO 、 DEBUG 、 TRACE 、 ALL -->
+    <!-- 日志输出规则  根据当前ROOT 级别，日志输出时，级别高于root默认的级别时  会输出 -->
+    <!-- 以下  每个配置的 filter 是过滤掉输出文件里面，会出现高级别文件，依然出现低级别的日志信息，通过filter 过滤只记录本级别的日志-->
+
+    <!-- 定义日志文件 输入位置 -->
+    <property name="logPath" value="log"/>
+    <property name="logFileName" value="log" />
+    <property name="SQLLogFileName" value="sql" />
+    <!-- 日志最大的历史 30天，这个参数要看你基于哪一种滚动策略【基于天，单位为天，月同理】本文件设置的多事基于天滚动策略 -->
+    <property name="maxHistory" value="30"/>
+    <!-- 日志输出格式【控制台】 [%p][%c][%M][%L] -->
+    <property name="logPatternConsoleLog" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%15.15thread]  %cyan(%-41.41class{41}):%boldGreen(%-4line) --- %msg%n"/>
+    <!-- 日志输出格式【日志文件】 -->
+    <property name="logPattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level  %class.%method:%line --- %msg%n"/>
+    <!-- 日志输出编码格式 -->
+    <property name="logCharset" value="UTF-8"/>
+    <property name="maxFileSize" value="10MB" />
+
+    <!-- %m输出的信息,%p日志级别,%t线程名,%d日期,%c类的全名,%i索引【从数字0开始递增】,,, -->
+    <!-- appender是configuration的子节点，是负责写日志的组件。 -->
+    <!-- ConsoleAppender：把日志输出到控制台 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${logPatternConsoleLog}</pattern>
+            <charset>${logCharset}</charset>
+        </encoder>
+    </appender>
+    <!-- RollingFileAppender：滚动记录文件，先将日志记录到指定文件，当符合某个条件时，将日志记录到其他文件 -->
+    <!-- 以下的大概意思是：1.先按日期存日志，日期变了，将前一天的日志文件名重命名为XXX%日期%索引，新的日志仍然是sys.log -->
+    <!--             2.如果日期没有发生变化，但是当前日志的文件大小超过1KB时，对当前日志进行分割 重命名-->
+    <appender name="rollingFileLog" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- rollingPolicy:当发生滚动时，决定 RollingFileAppender 的行为，涉及文件移动和重命名。 -->
+        <!-- TimeBasedRollingPolicy： 最常用的滚动策略，它根据时间来制定滚动策略，既负责滚动也负责出发滚动 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 活动文件的名字会根据fileNamePattern的值，每隔一段时间改变一次 -->
+            <!-- 文件名：log/2017-12-05/log.0.log -->
+            <fileNamePattern>${logPath}/%d{yyyy-MM-dd}/${logFileName}.%i.log</fileNamePattern>
+            <!-- 每产生一个日志文件，该日志文件的保存期限为30天 -->
+            <maxHistory>${maxHistory}</maxHistory>
+            <timeBasedFileNamingAndTriggeringPolicy  class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <!-- maxFileSize:这是活动文件的大小，默认值是10MB,本篇设置为1KB，只是为了演示 -->
+                <maxFileSize>${maxFileSize}</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${logPattern}</pattern>
+            <charset>${logCharset}</charset>
+        </encoder>
+    </appender>
+    <appender name="SQLRollingFileLog" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- rollingPolicy:当发生滚动时，决定 RollingFileAppender 的行为，涉及文件移动和重命名。 -->
+        <!-- TimeBasedRollingPolicy： 最常用的滚动策略，它根据时间来制定滚动策略，既负责滚动也负责出发滚动 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 活动文件的名字会根据fileNamePattern的值，每隔一段时间改变一次 -->
+            <!-- 文件名：log/2017-12-05/log.0.log -->
+            <fileNamePattern>${logPath}/%d{yyyy-MM-dd}/${SQLLogFileName}.%i.log</fileNamePattern>
+            <!-- 每产生一个日志文件，该日志文件的保存期限为30天 -->
+            <maxHistory>${maxHistory}</maxHistory>
+            <timeBasedFileNamingAndTriggeringPolicy  class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <!-- maxFileSize:这是活动文件的大小，默认值是10MB,本篇设置为1KB，只是为了演示 -->
+                <maxFileSize>${maxFileSize}</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${logPattern}</pattern>
+            <charset>${logCharset}</charset>
+        </encoder>
+    </appender>
+    <!-- 控制台输出日志级别 -->
+    <!-- 开发环境. -->
+    <springProfile name="dev">
+        <root level="info">
+            <appender-ref ref="CONSOLE" />
+        </root>
+        <logger name="com.dcfs.smartaibank" level="debug" additivity="false">
+            <appender-ref ref="CONSOLE" />
+        </logger>
+        <logger name="druid.sql.DataSource" level="debug" additivity="false">
+            <appender-ref ref="CONSOLE" />
+        </logger>
+        <logger name="druid.sql.Connection" level="debug" additivity="false">
+            <appender-ref ref="CONSOLE" />
+        </logger>
+        <logger name="druid.sql.Statement" level="debug" additivity="false">
+            <appender-ref ref="CONSOLE" />
+        </logger>
+        <logger name="druid.sql.ResultSet" level="debug" additivity="false">
+            <appender-ref ref="CONSOLE" />
+        </logger>
+		<logger name="org.apache.velocity" level="error" additivity="false">
+			<appender-ref ref="CONSOLE" />
+		</logger>
+    </springProfile>
+    <!-- 测试环境. -->
+    <springProfile name="test">
+        <root level="info">
+            <appender-ref ref="rollingFileLog" />
+        </root>
+        <logger name="com.dcfs.smartaibank" level="debug" additivity="false">
+            <appender-ref ref="rollingFileLog" />
+        </logger>
+        <logger name="druid.sql.DataSource" level="debug" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+        <logger name="druid.sql.Connection" level="debug" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+        <logger name="druid.sql.Statement" level="debug" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+        <logger name="druid.sql.ResultSet" level="debug" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+		<logger name="org.apache.velocity" level="error" additivity="false">
+			<appender-ref ref="rollingFileLog" />
+		</logger>
+    </springProfile>
+    <!-- 生产环境. -->
+    <springProfile name="prod">
+        <root level="warn">
+            <appender-ref ref="rollingFileLog" />
+        </root>
+        <logger name="com.dcfs.smartaibank" level="info" additivity="false">
+            <appender-ref ref="rollingFileLog" />
+        </logger>
+        <logger name="druid.sql.DataSource" level="warn" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+        <logger name="druid.sql.Connection" level="warn" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+        <logger name="druid.sql.Statement" level="warn" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+        <logger name="druid.sql.ResultSet" level="warn" additivity="false">
+            <appender-ref ref="SQLRollingFileLog" />
+        </logger>
+		<logger name="org.apache.velocity" level="error" additivity="false">
+			<appender-ref ref="rollingFileLog" />
+		</logger>
+    </springProfile>
+</configuration>

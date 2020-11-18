@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.NetworkDao">
+	<insert id="insert" parameterType="java.util.HashMap">
+		INSERT INTO MAS_DEVICE_INFO(
+			SEQ_NO,
+			BRANCH_NO,
+			MAC,
+			M_TYPE,
+			MID,
+			MNAME,
+			MMODELKEY,
+			MCLASSKEY,
+			MCLASSNAME,
+			M_STATUS,
+			FIELD_NO,
+			FIELD_NAME,
+			MANUF_ID,
+			MANUF_NAME,
+			STATUS,
+			RECEIVE_TIME,
+			RECEIVE_TIME_INT,
+			BRANCH_NAME
+		) VALUES (
+			#{SEQ_NO},
+			#{BRANCH_NO},
+			#{MAC},
+			#{M_TYPE},
+			#{MID},
+			#{MNAME,jdbcType=VARCHAR},
+			#{MMODELKEY},
+			#{MCLASSKEY},
+			#{MCLASSNAME},
+			#{M_STATUS},
+			#{FIELD_NO, jdbcType=VARCHAR},
+			#{FIELD_NAME, jdbcType=VARCHAR},
+			#{MANUF_ID, jdbcType=VARCHAR},
+			#{MANUF_NAME, jdbcType=VARCHAR},
+			#{STATUS, jdbcType=DECIMAL},
+			#{RECEIVE_TIME},
+			#{RECEIVE_TIME_INT},
+			#{BRANCH_NAME}
+		)
+	</insert>
+	<update id="update" parameterType="java.util.HashMap">
+		UPDATE MAS_DEVICE_INFO
+		<set>
+			<if test="BRANCH_NO != null">BRANCH_NO=#{BRANCH_NO},</if>
+			<if test="MAC != null">MAC=#{MAC},</if>
+			<if test="M_TYPE != null">M_TYPE=#{M_TYPE},</if>
+			<if test="MID != null">MID=#{MID},</if>
+			<if test="MNAME != null">MNAME=#{MNAME},</if>
+			<if test="MMODLEKEY != null">MMODELKEY=#{MMODELKEY},</if>
+			<if test="MCLASSKEY != null">MCLASSKEY=#{MCLASSKEY},</if>
+			<if test="MCLASSNAME != null">MCLASSNAME=#{MCLASSNAME},</if>
+			<if test="M_STATUS != null">M_STATUS=#{M_STATUS},</if>
+			<if test="FIELD_NO != null">FIELD_NO=#{FIELD_NO},</if>
+			<if test="FIELD_NAME != null">FIELD_NAME=#{FIELD_NAME},</if>
+			<if test="MANUF_ID != null">MANUF_ID=#{MANUF_ID},</if>
+			<if test="MANUF_NAME != null">MANUF_NAME=#{MANUF_NAME},</if>
+			<if test="STATUS != null">STATUS=#{STATUS},</if>
+			<if test="RECEIVE_TIME != null">RECEIVE_TIME=#{RECEIVE_TIME},</if>
+			<if test="RECEIVE_TIME_INT != null">RECEIVE_TIME_INT=#{RECEIVE_TIME_INT},</if>
+		</set>
+		WHERE SEQ_NO=#{SEQ_NO}
+	</update>
+
+	<insert id="insertAlarm" parameterType="java.util.HashMap">
+		<selectKey resultType="java.lang.String" keyProperty="ID" order="BEFORE">
+			select
+			'N'||lpad(MAS_DEVICE_ALARM_INFO_SEQ.nextval, 12, '0') as
+			ID From DUAL
+		</selectKey>
+		INSERT INTO MAS_DEVICE_ALARM_INFO(
+			ID,
+			ALARM_LEVEL,
+			DESCRIPTION,
+			ALARM_DATE,
+			ALARM_STATUS,
+			MAC,
+			MID,
+			MCLASSKEY,
+			MCLASSNAME,
+			MMODELKEY,
+			BRANCH_NO,
+			BRANCH_NAME,
+			FIELD_NO,
+			FIELD_NAME,
+			MANUF_ID,
+			MANUF_NAME,
+			RULE_ID,
+			MONITOR_ITEM_ID,
+			M_TYPE
+		) VALUES (
+			#{ID},
+			#{ALARM_LEVEL},
+			#{ALARM_DESC},
+			#{ALARM_DATE},
+			#{ALARM_STATUS},
+			#{MAC},
+			#{MID},
+			#{MCLASSKEY},
+			#{MCLASSNAME},
+			#{MMODELKEY},
+			#{BRANCH_NO},
+			#{BRANCH_NAME},
+			#{FIELD_NO},
+			#{FIELD_NAME},
+			<!--
+			#{MANUF_ID, jdbcType=VARCHAR},
+			#{MANUF_NAME, jdbcType=VARCHAR},-->
+			(select MANUFACTURERID from TL9_DEVICE_MODEL where DEVMODELKEY=#{MMODELKEY}),
+			(select B.NAME from TL9_DEVICE_MODEL A,TL9_DEVICE_MANUFACTURER B where A.DEVMODELKEY=#{MMODELKEY} AND A.MANUFACTURERID = B.MANUFACTURERID),
+			#{ALARM_RULE_ID},
+			#{MONITOR_ITEM_ID},
+			#{M_TYPE}
+		)
+	</insert>
+	<select id="count" parameterType="java.util.HashMap" resultType="int">
+		SELECT
+		    COUNT(*)
+		FROM
+		    MAS_DEVICE_ALARM_INFO
+		WHERE
+		    MID=#{MID}
+			AND ALARM_STATUS &lt; 4
+			AND RULE_ID = #{ALARM_RULE_ID}
+			AND ALARM_LEVEL &gt;= #{ALARM_LEVEL}
+	</select>
+
+	<select id="queryAlarmInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+		    ID
+		FROM
+		    MAS_DEVICE_ALARM_INFO
+		WHERE
+		    MID=#{MID}
+		    AND M_TYPE = #{M_TYPE}
+			AND ALARM_STATUS &lt; 4
+	</select>
+
+	<update id="updateAlarm" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_ALARM_DEAL_INFO
+		SET
+			END_TIME = #{END_TIME}
+		WHERE ALARM_ID = #{ID}
+	</update>
+
+	<update id="updateAlarmStatus" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_DEVICE_ALARM_INFO
+		SET
+			ALARM_STATUS=#{ALARM_STATUS}
+		WHERE ID = #{ID}
+	</update>
+
+	<!-- 自动解除并关闭 -->
+	<insert id="insertAlarmDealInfo" parameterType="java.util.HashMap" >
+		insert INTO MAS_ALARM_DEAL_INFO (
+		SEQ_ID,
+		ALARM_ID,
+		BEGIN_TIME,
+		END_TIME,
+		CLOSE_TIME,
+		CLOSE_TYPE,
+		FAULT_REASON
+		) values (
+		#{ID}||to_char(sysdate,'yyyymmddhh24miss'),
+		#{ID},
+		#{END_TIME},
+		#{END_TIME},
+		#{END_TIME},
+		'1',
+		'自动关闭'
+		)
+	</insert>
+
+		<!--查询督促时间阈值-->
+	<select id="queryAlarmDelay" parameterType="java.util.Map"
+		resultType="string">
+		SELECT CODE_VALUE FROM MAS_MONITOR_CONFIG
+		WHERE TYPE_NO = 'troubleshooting_time_threshold'
+		AND CODE_NO = #{REPAIR_LEVEL}
+	</select>
+
+
+
+</mapper>

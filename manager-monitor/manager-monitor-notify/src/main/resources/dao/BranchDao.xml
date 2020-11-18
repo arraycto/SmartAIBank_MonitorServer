@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.notify.dao.BranchDao">
+	<select id="getSuperior" resultType="java.util.HashMap">
+		SELECT ORGID as BRANCH_NO, BUSINESS_SUPERIOR as SUPERIOR
+		FROM TL9_ORGBASIC
+	</select>
+</mapper>

@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.AlarmQueryDao">
+
+	<resultMap id="base_result_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.AlarmInfo">
+		<result property="id" column="Id" />
+		<result property="description" column="description" />
+		<result property="modelId" column="mid"/>
+		<result property="mac" column="MAC"/>
+		<result property="modelClassName" column="MCLASSNAME" />
+		<result property="devClassKey" column="MCLASSNAME" />
+		<result property="alarmLevel" column="ALARMLEVEL"/>
+		<result property="alarmDate" column="ALARMDATE" />
+		<result property="alarmDealStatus" column="ALARM_STATUS"/>
+		<result property="manufName" column="MANUF_NAME" />
+		<result property="fieldName" column="FIELD_NAME" />
+		<result property="userId" column="user_id" />
+		<result property="userName" column="username" />
+		<result property="branchNo" column="branch_no" />
+		<result property="branchName" column="branchName" />
+		<result property="repairTime" column="REPAIR_TIME" />
+		<result property="recoverTime" column="END_TIME" />
+		<result property="startTime" column="BEGIN_TIME" />
+		<result property="closeType" column="CLOSE_TYPE" />
+		<result property="devModelName" column="DEVMODELNAME" />
+		<result property="ip" column="ip" />
+	</resultMap>
+
+	<resultMap id="tran_result_map" type="com.dcfs.smartaibank.manager.monitor.web.domian.AlarmTranInfo">
+		<result property="tranStatus" column="TRAN_STATUS" />
+		<result property="alarmLevel" column="ALARMLEVEL" />
+		<result property="tranType" column="TRAN_TYPE" />
+		<result property="tranTypeName" column="TRAN_TYPE_NAME" />
+		<result property="seqId" column="SEQ_NO" />
+		<result property="id" column="id" />
+		<result property="tranAmt" column="TRAN_AMT" />
+		<result property="tranCardNo" column="TRAN_CARD_NO" />
+		<result property="tranCardType" column="TRAN_CARD_TYPE" />
+		<result property="tranCardTypeName" column="TRAN_CARD_TYPE_NAME" />
+		<result property="description" column="description" />
+		<result property="alarmDate" column="ALARMDATE" />
+		<result property="modelNo" column="MID" />
+		<result property="modelTypeName" column="MCLASSKEY" />
+		<result property="branchNo" column="BRANCH_NO" />
+		<result property="branchName" column="BRANCH_NAME" />
+		<result property="alarmStatus" column="ALARM_STATUS" />
+		<result property="fieldName" column="FIELD_NAME" />
+		<result property="tranType" column="TRAN_TYPE" />
+		<result property="manufacturerName" column="name" />
+	</resultMap>
+
+	<sql id="alarmdate_order_sql">
+		<choose>
+			<when test="orderColumn !=null and orderColumn !=''">
+				order by ${orderColumn}
+			</when>
+			<otherwise>
+				order by ALARM_DATE DESC
+			</otherwise>
+		</choose>
+	</sql>
+	<sql id="order_column_sql">
+		<if test="orderColumn !=null and orderColumn !=''">
+			order by ${orderColumn}
+		</if>
+	</sql>
+	<!-- 查询所有设备预警信息-->
+	<!-- modify by wangjzm @2019.10.24 reason:应该关联MAS_MCLASS_MONITOR表中的active字段，去掉没有被监控的设备 -->
+	<select id="queryDevAlarmInfo" resultMap="base_result_map" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmParams"
+	>
+		select d.id,
+		d.description,
+		d.ALARM_LEVEL as ALARMLEVEL,
+		to_char(d.ALARM_DATE,'yyyy-mm-dd hh24:mi:ss') as
+		ALARMDATE,
+		d.ALARM_STATUS,
+		t.user_id,
+		u.username,
+		d.MID,
+		d.MAC,
+		d.FIELD_NAME,
+		d.MANUF_NAME,
+		d.MCLASSNAME,
+		d.BRANCH_NO ||'-'|| d.BRANCH_NAME as "branchName"
+		from mas_device_alarm_info d
+		left join mas_alarm_deal_info t
+		on d.id=t.ALARM_ID
+		left join tl9_userbasic u
+		on t.user_id = u.userid
+		left join (SELECT *
+		FROM TL9_SM_BRANCH_DEVICE dev, MAS_MCLASS_MONITOR conf
+		WHERE dev.DEVCLASSKEY = conf.MCLASSKEY
+		AND conf.ACTIVE = '1') b
+		on d.MID = b.DEVICEID
+		WHERE
+		d.BRANCH_NO in (select orgid
+		from TL9_ORGBASIC
+		WHERE orgstatustypeid!='0'
+		START WITH  orgid = #{branchNo}
+		CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid
+		)
+		and  b.status=1
+		<if test="devType!='' and devType!=null">
+			and d.MCLASSKEY=#{devType}
+		</if>
+		<if test="devId!='' and devId!=null">
+			and d.MID like '%'||#{devId}||'%'
+		</if>
+		<if test="alarmDealStatus==null">
+			<include refid="alarmdate_order_sql"></include>
+		</if>
+		<if test="alarmDealStatus!=null">
+			and  d.ALARM_STATUS=#{alarmDealStatus,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+			<choose>
+				<when test="@com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealStatus@isEquals('UNDEAL',alarmDealStatus)">
+					<include refid="alarmdate_order_sql"></include>
+				</when>
+				<when test="@com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealStatus@isEquals('DEAL',alarmDealStatus)">
+					<include refid="order_column_sql"></include>
+					<if test="orderColumn ==null or orderColumn ==''">
+						order by t.begin_time DESC
+					</if>
+				</when>
+			</choose>
+		</if>
+	</select>
+
+	<select id="queryDevAlarmInfobyLevel" resultMap="base_result_map" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmParams"
+	>
+		select *
+		from mas_device_alarm_info t
+		left join TL9_SM_BRANCH_DEVICE b on t.MID = b.DEVICEID
+		where t.alarm_status=1 and t.alarm_level=#{level} and t.branch_no in (
+																	select orgid  from TL9_ORGBASIC
+																	WHERE orgstatustypeid!='0'
+																	START WITH  orgid = #{branchNo}
+																	CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid
+                                                                    )
+	</select>
+	<!-- 查询关于我的设备预警信息-->
+	<!-- modify by wangjzm @2019.10.24 reason:应该关联MAS_MCLASS_MONITOR表中的active字段，去掉没有被监控的设备 -->
+	<select id="queryDevAlarmInfoByUser" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmParams"
+			resultMap="base_result_map">
+		select d.id,
+		d.description,
+		d.ALARM_LEVEL as ALARMLEVEL,
+		to_char(d.ALARM_DATE,'yyyy-mm-dd hh24:mi:ss') as
+		ALARMDATE,
+		d.ALARM_STATUS,
+		d.MID,
+		d.MAC,
+		d.FIELD_NAME,
+		d.MANUF_NAME,
+		d.MCLASSKEY,
+		d.MCLASSNAME,
+		d.BRANCH_NO,
+		d.BRANCH_NO ||'-'|| d.BRANCH_NAME as "branchName",
+		t.user_id,
+		to_char(t.REPAIR_TIME,'yyyy-mm-dd hh24:mi:ss') as
+		REPAIR_TIME,
+		to_char(t.END_TIME,'yyyy-mm-dd hh24:mi:ss') as
+		END_TIME,
+		to_char(t.BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss') as
+		BEGIN_TIME,
+		t.CLOSE_TYPE,
+		a.DEVMODELNAME,
+		b.ip,
+		u.username
+		from mas_device_alarm_info d
+		LEFT join mas_alarm_deal_info t
+		on d.id=t.ALARM_ID
+		LEFT join tl9_userbasic u
+		on t.user_id = u.userid
+		left join tl9_device_model a
+		on d.DEVMODELKEY = a.DEVMODELKEY
+		left join (SELECT *
+		FROM TL9_SM_BRANCH_DEVICE dev, MAS_MCLASS_MONITOR conf
+		WHERE dev.DEVCLASSKEY = conf.MCLASSKEY
+		AND conf.ACTIVE = '1') b
+		on d.MID = b.DEVICEID
+		where t.user_id=#{userId}
+		and (d.ALARM_DATE
+		between to_date(#{startDateTime,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		and to_date(#{endDateTime,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'))
+		and  b.status=1
+		<if test="branchNo!='' and branchNo!=null">
+			and d.BRANCH_NO in(select orgid
+			from TL9_ORGBASIC
+			WHERE orgstatustypeid!='0'
+			START WITH  orgid = #{branchNo}
+			CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+		</if>
+		<if test="devType!='' and devType!=null">
+			and d.MCLASSKEY=#{devType}
+		</if>
+		<if test="devId!='' and devId!=null">
+			and d.MID like '%'||#{devId}||'%'
+		</if>
+
+		<if test="alarmDealStatus==null">
+			<choose>
+				<when test="orderColumn !=null and orderColumn !=''">
+					order by ${orderColumn}
+				</when>
+				<otherwise>
+					order by t.begin_TIME DESC
+				</otherwise>
+			</choose>
+		</if>
+
+		<if test="alarmDealStatus!=null">
+			<choose>
+				<when test="@com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealStatus@isEquals('RELIEVE',alarmDealStatus)">
+					and (d.ALARM_STATUS =4 or d.ALARM_STATUS =5)
+					<include refid="order_column_sql"></include>
+					<if test="orderColumn ==null or orderColumn ==''">
+						order by t.END_TIME DESC
+					</if>
+				</when>
+				<otherwise>
+					and  d.ALARM_STATUS=#{alarmDealStatus,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler}
+					<choose>
+						<when test="@com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealStatus@isEquals('DEAL',alarmDealStatus)">
+							<include refid="order_column_sql"></include>
+							<if test="orderColumn ==null or orderColumn ==''">
+								order by t.BEGIN_TIME DESC
+							</if>
+						</when>
+						<when test="@com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealStatus@isEquals('REPAIRS',alarmDealStatus)">
+							<include refid="order_column_sql"></include>
+							<if test="orderColumn ==null or orderColumn ==''">
+								order by t.REPAIR_TIME DESC
+							</if>
+						</when>
+						<when test="@com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealStatus@isEquals('SUBMIT',alarmDealStatus)">
+							<include refid="order_column_sql"></include>
+							<if test="orderColumn ==null or orderColumn ==''">
+								order by t.BEGIN_TIME DESC
+							</if>
+						</when>
+					</choose>
+				</otherwise>
+			</choose>
+		</if>
+	</select>
+
+	<select id="queryDevAlarmInfoByUserbyLevel" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmParams"
+			resultMap="base_result_map">
+		select *
+		from mas_device_alarm_info t
+		left join TL9_SM_BRANCH_DEVICE b on t.MID = b.DEVICEID
+		where t.alarm_status=1 and t.alarm_level=#{level} and t.branch_no in (
+																	select orgid  from TL9_ORGBASIC
+																	WHERE orgstatustypeid!='0'
+																	START WITH  orgid = #{branchNo}
+																	CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid
+                                                                    )
+	</select>
+	<!--查询所有机具的预警消息数量-->
+	<!-- modify by wangjzm @2019.10.24 reason:应该关联MAS_MCLASS_MONITOR表中的active字段，去掉没有被监控的设备 -->
+	<select id="queryAlarmCount" parameterType="java.lang.String"
+			resultType="java.lang.Integer">
+		SELECT COUNT (1)
+		  FROM (SELECT id
+				  FROM mas_device_alarm_info d,
+					   tl9_sm_branch_device e,
+					   MAS_MCLASS_MONITOR c
+				 WHERE     d.mid = e.deviceid
+					   AND E.DEVCLASSKEY = C.MCLASSKEY
+					   AND C.ACTIVE = '1'
+					   AND d.alarm_status = 1
+					   AND d.branch_no IN
+							  (    SELECT orgid
+									 FROM TL9_ORGBASIC
+									WHERE orgstatustypeid != '0'
+							   START WITH orgid = #{branchNo}
+							   CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+					   AND e.status = 1
+				UNION ALL
+				SELECT id
+				  FROM MAS_TRAN_ALARM_INFO t
+				 WHERE t.alarm_status = 1
+					   AND t.branch_no IN
+							  (    SELECT orgid
+									 FROM TL9_ORGBASIC
+									WHERE orgstatustypeid != '0'
+							   START WITH orgid = #{branchNo}
+							   CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid))
+	</select>
+
+	<select id="querySimpleAlarmInfo" parameterType="java.lang.String" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlarmInfo">
+        select * from
+        (select t.ALARM_LEVEL as "alarmLevel",
+        t.description as "description",
+        o.begin_time as "alarmDate",
+        'device' as "warnType"
+        from mas_device_alarm_info t
+        left join mas_alarm_deal_info o
+        on t.id = o.alarm_id
+        where t.alarm_status=2
+        and t.branch_no in (
+        select orgid  from TL9_ORGBASIC
+        WHERE orgstatustypeid!='0'
+        START WITH  orgid = #{branchNo}
+        CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+		order by "alarmDate" desc)
+        where rownum &lt;4
+    </select>
+
+	<select id="queryAlarmNum" parameterType="java.lang.String" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlarmNum">
+		select (select count(1)
+              from mas_tran_alarm_info t
+                 where t.alarm_status=1 and t.alarm_level=#{level} and t.branch_no in (
+																	select orgid  from TL9_ORGBASIC
+																	WHERE orgstatustypeid!='0'
+																	START WITH  orgid = #{branchNo}
+																	CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid
+																	)) as "tranNum" ,t."deviceNum"
+		from
+		(
+		select count(1) as "deviceNum"
+		from mas_device_alarm_info t
+		left join TL9_SM_BRANCH_DEVICE b on t.MID = b.DEVICEID
+		where t.alarm_status=1 and t.alarm_level=#{level} and t.branch_no in (
+																	select orgid  from TL9_ORGBASIC
+																	WHERE orgstatustypeid!='0'
+																	START WITH  orgid = #{branchNo}
+																	CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid
+                                                                    )
+                                                                    and  b.status=1
+        ) t
+	</select>
+
+	<select id="queryAlarmTranInfo" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmTransParams"
+			resultMap="tran_result_map">
+		select t.id,
+		t.ALARM_LEVEL as ALARMLEVEL,
+		t.description,
+		to_char(t.ALARM_DATE,'yyyy-mm-dd hh24:mi:ss') as
+		ALARMDATE,
+		t.ALARM_STATUS,
+		t.MID,
+		t.MCLASSKEY,
+		t.MCLASSNAME,
+		t.FIELD_NAME,
+		t.BRANCH_NO,
+		t.BRANCH_NO ||'-'|| t.BRANCH_NAME as BRANCH_NAME,
+		t.TRAN_STATUS,
+		t.TRAN_TYPE,
+		t.TRAN_TYPE_NAME,
+		t.TRAN_AMT,
+		t.TRAN_CARD_NO,
+		t.TRAN_CARD_TYPE_NAME,
+		t.SEQ_NO,
+		mu.name
+		from mas_tran_alarm_info t
+		left JOIN TL9_SM_BRANCH_DEVICE m ON t.MID = m.DEVICEID
+		LEFT JOIN TL9_DEVICE_MODEL mm on m.devmodelkey = mm.devmodelkey
+		LEFT JOIN TL9_DEVICE_MANUFACTURER mu ON mm.manufacturerid = mu.manufacturerid
+		where t.alarm_status &lt; #{alarmStatus}
+		and
+		(t.ALARM_DATE
+		between to_date(#{startDateTime,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss')
+		and to_date(#{endDateTime,jdbcType=VARCHAR},'yyyy-mm-dd hh24:mi:ss'))
+		<if test="devType!='' and devType!=null">
+			and t.MCLASSKEY=#{devType}
+		</if>
+		<if test="devId!='' and devId!=null">
+			and t.MID like '%'||#{devId}||'%'
+		</if>
+		<if test="seqId!='' and seqId!=null">
+			and t.SEQ_NO like '%'||#{seqId}||'%'
+		</if>
+		<if test="isManager == true">
+			and t.branch_no in (select orgid from TL9_ORGBASIC
+			WHERE orgstatustypeid!='0'
+			START WITH orgid = #{branchNo}
+			CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+		</if>
+		<if test="isManager == false">
+			and t.branch_no = #{branchNo}
+		</if>
+		<if test="alarmOrder!='' and alarmOrder!=null">
+			ORDER BY ${alarmOrder}
+		</if>
+		<if test="alarmOrder=='' or alarmOrder==null">
+			ORDER BY t.ALARM_DATE DESC
+		</if>
+	</select>
+
+	<select id="queryAlarmTranInfobyLevel" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmTransParams"
+			resultMap="tran_result_map">
+		select *
+              from mas_tran_alarm_info t
+                 where t.alarm_status=1 and t.alarm_level=#{level} and t.branch_no in (
+																	select orgid  from TL9_ORGBASIC
+																	WHERE orgstatustypeid!='0'
+																	START WITH  orgid = #{branchNo}
+																	CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+	</select>
+	<!--预警解除-->
+	<update id="removeTran" >
+		update mas_tran_alarm_info t set t.ALARM_STATUS = 4 where t.id = #{id}
+	</update>
+
+	<update id="updateAlarmInfoStatus" parameterType="java.lang.String" >
+		UPDATE
+			MAS_DEVICE_ALARM_INFO
+		SET
+		ALARM_STATUS=#{status}
+		WHERE ALARM_STATUS=1
+		and ID =#{id}
+	</update>
+
+	<update id="updateHandUpStatus" parameterType="java.lang.String" >
+		UPDATE
+		MAS_DEVICE_ALARM_INFO
+		SET
+		ALARM_STATUS=#{status}
+		WHERE ALARM_STATUS !=1
+		and ID =#{id}
+	</update>
+
+	<update id="updateDealHandUp">
+	  	update mas_alarm_deal_info
+	  	set	begin_time =#{date}
+	  	where alarm_id=#{alarmId}
+	</update>
+
+	<!-- 报修 -->
+	<insert id="insertRepairInfo" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmRepairInfo">
+		insert into MAS_REPAIR_ALARM_INFO
+		(
+		REPAIR_ID,
+		ALARM_ID,
+		REPAIR_USER_NAME,
+		DEVICE_ID
+		)
+		values(
+		#{repairId},
+		#{alarmId},
+		#{repairUserName},
+		#{deviceId}
+		)
+
+	</insert>
+
+	<!-- 预警登记故障报修 -->
+	<update id="updateAlarmRepairInfo">
+		update MAS_ALARM_DEAL_INFO
+		set REPAIR_TIME=#{repairDate}
+		where ALARM_ID=#{alarmId}
+	</update>
+
+	<!-- 工单登记 -->
+	<update id="updateAlarmRepairRecord" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmWorkInfo" >
+		update MAS_REPAIR_ALARM_INFO
+		set REPAIR_USER_NAME=#{repairUserName},
+		RECEIVE_TIME=#{receiveTime},
+		END_TIME=#{endTime},
+		REPAIR_EVALUATE=#{repairEvaluate},
+		REPAIR_DESC=#{repairDesc}
+		where ALARM_ID=#{alarmId}
+	</update>
+
+	<!-- 工单登记 关闭预警 -->
+	<update id="updateAlarmCloseStatus" parameterType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmWorkInfo" >
+		update MAS_ALARM_DEAL_INFO
+		set CLOSE_TIME=#{closeTime},
+		CLOSE_TYPE=#{closeType},
+		REPAIR_OPERATE=#{repairOperate},
+		FAULT_REASON=#{faultReason}
+		where ALARM_ID=#{alarmId}
+	</update>
+
+	<!-- 开始处理-->
+	<insert id="insertAlarmBeginDeal" parameterType="com.dcfs.smartaibank.manager.monitor.web.domian.AlarmDealInfo" >
+		insert INTO MAS_ALARM_DEAL_INFO (
+		SEQ_ID,
+		ALARM_ID,
+		BEGIN_TIME,
+		USER_ID
+		) values (
+		#{seqId},
+		#{alarmId},
+		#{beginTime},
+		#{userId}
+		)
+	</insert>
+
+	<!-- 更新预警状态 -->
+	<update id="updateAlarmStatus" parameterType="string">
+		update MAS_DEVICE_ALARM_INFO
+		set ALARM_STATUS=#{status}
+        where ID=#{alarmId}
+	</update>
+
+	<select id="getAlarmInfo" parameterType="java.lang.String" resultType="com.dcfs.smartaibank.manager.monitor.web.param.AlarmWorkInfo">
+			SELECT
+				r.ALARM_ID as "alarmId",
+				r.REPAIR_DESC as "repairDesc",
+				r.REPAIR_EVALUATE as "repairEvaluate",
+				r.REPAIR_USER_NAME as "repairUserName",
+				r.RECEIVE_TIME as "receiveTime",
+				a.REPAIR_OPERATE as "repairOperate",
+				to_char(r.END_TIME,'yyyy-mm-dd hh24:mi:ss') as "repairEndTime",
+			    d.DESCRIPTION as "faultReason",
+				d.MCLASSNAME as "devClassName",
+				a.CLOSE_TIME as "repairTime"
+		FROM MAS_REPAIR_ALARM_INFO r
+		LEFT JOIN MAS_DEVICE_ALARM_INFO d
+		on r.ALARM_ID = d.id
+		LEFT JOIN MAS_ALARM_DEAL_INFO a
+		on r.ALARM_ID = a.ALARM_ID
+		where r.ALARM_ID = #{id}
+
+	</select>
+
+	<!--查询维修人员信息-->
+	<select id="getMaintainer" parameterType="string" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.AlarmMaintainer">
+		SELECT tdmm.NAME_GIVEN || tdmm.name_sur repairUserName, tdmm.MOBILE_NO as moblieNo
+  		FROM    mas_device_alarm_info alarm,TL9_DEVICE_MAINTENANCE tdmn
+       LEFT JOIN
+          TL9_DEVICE_MAINTAINER tdmm ON tdmn.MAINTAINERID = tdmm.MAINTAINERID
+ 		WHERE alarm.mmodelkey = tdmn.DEVMODELKEY AND ALARM.ID = #{alarmId}
+	</select>
+
+
+</mapper>

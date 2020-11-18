@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.HistoryReportBojjDao">
+    <!-- 查询监控交易处理详情列表 -->
+    <select id="queryBranchWaitTime" parameterType="java.lang.String" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.BranchWaitTimeReport">
+        SELECT BRANCH_NO AS branch,
+        BRANCH_NO AS orgID,
+        COUNT (TICKET_NO) AS ticketNumber,
+        ROUND((AVG (
+        TO_DATE (START_TIME, 'hh24:mi:ss')
+        - TO_DATE (APPLY_TIME, 'hh24:mi:ss'))
+        * 24
+        * 60),2)
+        AS waitTime
+        FROM SELFBANKTESTWZM1.TL9_QU_TRADE_HISTORY_INFO a
+        WHERE     A.BRANCH_NO = #{branchId}
+        AND TO_DATE (A.APPLY_DATE, 'yyyy-mm-dd') &gt;=
+        TO_DATE (#{startTime}, 'yyyy-mm-dd')
+        AND TO_DATE (A.APPLY_DATE, 'yyyy-mm-dd') &lt;=
+        TO_DATE (#{endTime}, 'yyyy-mm-dd')
+        GROUP BY BRANCH_NO
+    </select>
+
+    <!-- 查询监控交易处理详情列表 -->
+    <resultMap id="tran_detail_column" type="com.dcfs.smartaibank.manager.monitor.web.domian.QueueTime">
+        <result property="branchNo" column="branchNo"></result>
+        <result property="branchName" column="branchName"></result>
+        <result property="queueNum" column="queueNum"></result>
+        <result property="avgWaitTime" column="avgWaitTime"></result>
+        <result property="time" column="changeTime"></result>
+        <result property="rankNo" column="rankNo"></result>
+    </resultMap>
+    <select id="selectQueueWait" parameterType="java.lang.String" resultMap="tran_detail_column">
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY COUNT( Q.TICKET_NO ) DESC) AS rankNo,
+            Q.BRANCH_NO AS branchNo,
+            o.ORGNAME_CN AS branchName,
+            SUBSTR( Q.APPLY_DATE, 1, 6 ) AS changeTime,
+            COUNT( Q.TICKET_NO ) AS queueNum,
+            ROUND((AVG( ( TO_DATE( Q.START_DATE || Q.START_TIME, 'yyyymmdd hh24:mi:ss' ) -
+            TO_DATE( Q.APPLY_DATE || Q.APPLY_TIME, 'yyyymmdd hh24:mi:ss' ))* 24 * 60 )),2) AS avgWaitTime
+        FROM
+            TL9_QU_TRADE_HISTORY_INFO Q
+        LEFT JOIN TL9_ORGBASIC o ON
+            Q.BRANCH_NO = o.ORGID
+        WHERE
+            SUBSTR( Q.APPLY_DATE, 1, 6 ) = #{startDate}
+            AND o.ORGID IN(
+                SELECT
+                    orgid
+                FROM
+                    tl9_orgbasic oo
+                START WITH
+                    oo.orgid = #{branchId}
+                CONNECT BY
+                    oo.BUSINESS_SUPERIOR = PRIOR oo.orgid
+            )
+        GROUP BY
+            Q.BRANCH_NO,
+            o.ORGNAME_CN,
+	SUBSTR( Q.APPLY_DATE, 1, 6 )
+    </select>
+
+</mapper>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.ErrorAccountDao">
+
+	<!-- 错账登记 -->
+	<insert id="register">
+		insert into MAS_ACCOUNT_DEAL_INFO
+		(
+			DEVICE_ID,
+			CYCLE_ID,
+			CHECK_RESULT,
+			ACCOUNT_NUM,
+			START_TIME,
+			END_TIME,
+			OPERATE_USER,
+			OPERATE_DESC
+		)
+		values(
+			#{errorAccountInfo.deviceId},
+			#{errorAccountInfo.cycleId},
+			#{errorAccountInfo.checkResult},
+			#{errorAccountInfo.accountNum},
+			to_date(#{errorAccountInfo.startTime},'yyyy-MM-dd HH24:mi:ss'),
+			to_date(#{errorAccountInfo.endTime},'yyyy-MM-dd HH24:mi:ss'),
+			#{errorAccountInfo.operateUser},
+			#{errorAccountInfo.operateDesc}
+		)
+
+	</insert>
+
+
+	<!-- 查询本加钞周期的错账处理记录 -->
+	<select id="queryChecking" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.ErrorAccountInfo">
+			select DEVICE_ID as deviceId,
+			CYCLE_ID as cycleId,
+			CHECK_RESULT as checkResult,
+			ACCOUNT_NUM as accountNum,
+			to_char(START_TIME,'yyyy-mm-dd HH24:mm:ss') as startTime,
+			to_char(END_TIME,'yyyy-mm-dd HH24:mm:ss') AS endTime,
+			OPERATE_USER as operateUser,
+			OPERATE_DESC as operateDesc
+			from MAS_ACCOUNT_DEAL_INFO
+			where CYCLE_ID= #{cycleId}
+	</select>
+
+
+	<select id="check" parameterType="java.lang.String" resultType="java.lang.Integer">
+		SELECT count(1)
+			FROM
+		MAS_ACCOUNT_DEAL_INFO
+		where CYCLE_ID =#{id}
+	</select>
+
+</mapper>

@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.base.dao.UserDao">
+    <resultMap id="base_result_map" type="com.dcfs.smartaibank.manager.base.domain.User">
+        <result property="id" column="id"/>
+        <result property="name" column="USERNAME"/>
+        <result property="gender" column="GENDERID"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="mobile.country" column="MOBILE_NO"/>
+        <result property="mobile.no" column="MOBILE_NO"/>
+        <result property="phone.country" column="PHONE_COUNTRY"/>
+        <result property="phone.area" column="PHONE_AREA"/>
+        <result property="phone.no" column="PHONE_NO"/>
+        <result property="phone.sub" column="PHONE_SUBNO"/>
+        <result property="weChat" column="WECHAT"/>
+        <result property="fax" column="FAX"/>
+        <result property="email" column="EMAIL"/>
+        <result property="orgId" column="ORGID"/>
+        <result property="departmentId" column="DEPARTMENTID"/>
+        <result property="mediumType" column="MEDIUMTYPEID"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="useFlag" column="USEFLAG"
+                typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+        <result property="effectTime" column="EFFECTTIME"/>
+        <collection property="roles" javaType="List" ofType="String">
+            <result column="rid"/>
+        </collection>
+    </resultMap>
+    <resultMap id="role_result_map" type="com.dcfs.smartaibank.manager.base.domain.Role">
+        <id property="id" column="rid"/>
+        <!--<result property="name" column="ename"/>-->
+        <!--<result property="desc" column="edesc"/>-->
+        <!--<result property="systemId" column="esystemId"/>-->
+    </resultMap>
+	<resultMap id="user" type="com.dcfs.smartaibank.manager.base.domain.UserInfo">
+		<result column="USERID" property="id"/>
+		<result column="USERNAME" property="name"/>
+		<result column="ORGID" property="orgId"/>
+		<result column="ORGLEVELID" property="orgLevel"/>
+		<result column="ORGTYPEID" property="orgTypeId"/>
+		<result column="ORGNAME_CN" property="orgName"/>
+		<result column="USEFLAG" property="useFlag"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result column="EFFECTTIME" property="effectDate"/>
+		<result column="MEDIUMINFO" property="password"/>
+		<result column="STATUS" property="passwordStatus"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"/>
+		<result column="MEDIUMINFOLOCKTIME" property="passwordLockDate"/>
+		<result column="ERRORNUM" property="passwordErrorNum"/>
+		<result column="MEDIUMINFOUPDATETIME" property="passwordUpdateDate"/>
+		<collection property="roles" ofType="com.dcfs.smartaibank.manager.base.domain.RoleInfo" javaType="java.util.ArrayList">
+			<id column="ROLEID" property="id" />
+			<result column="ROLENAME" property="name" />
+			<result column="ROLEDESC" property="desc" />
+		</collection>
+	</resultMap>
+    <sql id="base_column_list">
+		U.USERID as id,
+        U.USERNAME,
+        U.USERTYPEID,
+        U.GENDERID,
+        U.MOBILE_COUNTRY,
+        U.MOBILE_NO,
+        U.PHONE_COUNTRY,
+        U.PHONE_AREA,
+        U.PHONE_NO,
+        U.PHONE_SUBNO,
+        U.WECHAT,
+        U.FAX,
+        U.EMAIL,
+        U.ORGID,
+        U.DEPARTMENTID,
+        U.MEDIUMTYPEID,
+        U.USEFLAG,
+        U.EFFECTTIME
+	</sql>
+    <sql id="role_column_list">
+        , UR.ROLEID as rid
+    </sql>
+    <sql id="base_from">
+        from TL9_USERBASIC U
+    </sql>
+    <sql id="base_where_list">
+        where (U.RECORDSTATUS is null or U.RECORDSTATUS = '0')
+          and U.USERTYPEID = 'A'
+          and U.USEFLAG='00'
+    </sql>
+    <sql id="detail_where_list">
+        <if test="id != null and id != ''">
+            and U.USERID = #{id}
+        </if>
+        <if test="name != null and name != ''">
+            and U.USERNAME like '%'||#{name}||'%'
+        </if>
+        <if test="orgId != null and orgId != ''">
+            and U.ORGID = #{orgId}
+        </if>
+        <if test="departmentId != null and departmentId != ''">
+            and U.DEPARTMENTID = #{departmentId}
+        </if>
+    </sql>
+    <sql id="role_left_join">
+        left join TL9_USERROLE UR on U.USERID = UR.USERID
+    </sql>
+    <select id="countSql" resultType="Integer">
+		select count(*) from TL9_USERBASIC
+	</select>
+    <insert id="insert" parameterType="com.dcfs.smartaibank.manager.base.domain.User">
+        insert into TL9_USERBASIC(
+            USERID,
+            USERNAME,
+            USERTYPEID,
+            GENDERID,
+            MOBILE_COUNTRY,
+            MOBILE_NO,
+            PHONE_COUNTRY,
+            PHONE_AREA,
+            PHONE_NO,
+            PHONE_SUBNO,
+            WECHAT,
+            FAX,
+            EMAIL,
+            ORGID,
+            DEPARTMENTID,
+            POSITIONID,
+            MEDIUMTYPEID,
+            ADDRESS_COUNTRY,
+            ADDRESS_PROVINCE,
+            ADDRESS_CITY,
+            ADDRESS_COUNTY,
+            ADDRESS_TOWN,
+            ADDRESS_STREET,
+            USEFLAG,
+            EFFECTTIME,
+            CREATETIME,
+            RECORDSTATUS
+        )
+        values
+        (
+            #{id, jdbcType=VARCHAR},
+            #{name, jdbcType=VARCHAR},
+            'A',
+            #{gender,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+            #{mobile.country, jdbcType=VARCHAR},
+            #{mobile.no, jdbcType=VARCHAR},
+            #{phone.country, jdbcType=VARCHAR},
+            #{phone.area, jdbcType=VARCHAR},
+            #{phone.no, jdbcType=VARCHAR},
+            #{phone.sub, jdbcType=VARCHAR},
+            #{wechat, jdbcType=VARCHAR},
+            #{fax, jdbcType=VARCHAR},
+            #{email, jdbcType=VARCHAR},
+            #{orgId, jdbcType=VARCHAR},
+            #{departmentId, jdbcType=VARCHAR},
+            #{positionId, jdbcType=VARCHAR},
+            #{mediumType, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+            #{address.country, jdbcType=VARCHAR},
+            #{address.province, jdbcType=VARCHAR},
+            #{address.city, jdbcType=VARCHAR},
+            #{address.county, jdbcType=VARCHAR},
+            #{address.town, jdbcType=VARCHAR},
+            #{address.street, jdbcType=VARCHAR},
+            #{useFlag, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+            #{effectTime, jdbcType=DATE},
+            #{createTime, jdbcType=DATE},
+            '0'
+        )
+  </insert>
+    <update id="updateByPrimaryKey" parameterType="com.dcfs.smartaibank.manager.base.domain.User">
+        update TL9_USERBASIC set
+        USERID = #{id, jdbcType=VARCHAR},
+        USERNAME = #{name, jdbcType=VARCHAR},
+        GENDERID = #{gender,jdbcType=VARCHAR, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        MOBILE_COUNTRY = #{mobile.country, jdbcType=VARCHAR},
+        MOBILE_NO = #{mobile.no, jdbcType=VARCHAR},
+        PHONE_COUNTRY = #{phone.country, jdbcType=VARCHAR},
+        PHONE_AREA = #{phone.area, jdbcType=VARCHAR},
+        PHONE_NO = #{phone.no, jdbcType=VARCHAR},
+        PHONE_SUBNO = #{phone.sub, jdbcType=VARCHAR},
+        WECHAT = #{wechat, jdbcType=VARCHAR},
+        FAX = #{fax, jdbcType=VARCHAR},
+        EMAIL = #{email, jdbcType=VARCHAR},
+        ORGID = #{orgId, jdbcType=VARCHAR},
+        DEPARTMENTID = #{departmentId, jdbcType=VARCHAR},
+        POSITIONID = #{positionId, jdbcType=VARCHAR},
+        MEDIUMTYPEID = #{mediumType, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        ADDRESS_COUNTRY = #{address.country, jdbcType=VARCHAR},
+        ADDRESS_PROVINCE = #{address.province, jdbcType=VARCHAR},
+        ADDRESS_CITY = #{address.city, jdbcType=VARCHAR},
+        ADDRESS_COUNTY = #{address.county, jdbcType=VARCHAR},
+        ADDRESS_TOWN = #{address.town, jdbcType=VARCHAR},
+        ADDRESS_STREET = #{address.street, jdbcType=VARCHAR},
+        USEFLAG = #{useFlag, typeHandler=com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler},
+        EFFECTTIME = #{effectTime, jdbcType=DATE},
+        UPDATETIME = #{updateTime, jdbcType=DATE},
+
+    </update>
+    <delete id="deleteByPrimaryKey" parameterType="String">
+        --delete from TL9_USERBASIC where USERID = #{id}
+        update TL9_USERBASIC set USEFLAG = '00' where USERID = #{id}
+    </delete>
+    <select id="selectByPrimaryKey" parameterType="String" resultMap="base_result_map">
+        select
+        <include refid="base_column_list"/>
+        <include refid="role_column_list"/>
+        <include refid="base_from"/>
+        <include refid="role_left_join"/>
+        <include refid="base_where_list"/>
+        and U.USERID = #{id}
+    </select>
+    <select id="selectAll" resultMap="base_result_map">
+        select
+        <include refid="base_column_list"/>
+        <include refid="role_column_list"/>
+        <include refid="base_from"/>
+        <include refid="role_left_join"/>
+        <include refid="base_where_list"/>
+    </select>
+    <select id="select" resultMap="base_result_map">
+        select
+        <include refid="base_column_list"/>
+        <include refid="role_column_list"/>
+        <include refid="base_from"/>
+        <include refid="role_left_join"/>
+        <include refid="base_where_list"/>
+        <include refid="detail_where_list"/>
+    </select>
+
+
+    <insert id="insertUserRole" parameterType="java.util.Map">
+        insert into TL9_USERROLE(USERID, ROLEID) values(#{userId}, #{roleId})
+    </insert>
+
+    <insert id="insertUserMedium" parameterType="String">
+        insert into TL9_USERMEDIUM
+        (
+            USERID,
+            MEDIUMTYPEID,
+            MEDIUMINFO,
+            MEDIUMINFOUPDATETIME,
+            ERRORNUM,
+            STATUS,
+            MEDIUMINFOLOCKTIME,
+            SYSTEMID)
+        VALUES(
+            #{userId},
+            '1',
+            '5AEA19BDBF0350E6028DFFF43FAD46C7',
+            NULL,
+            0,
+            '0',
+            NULL,
+            'OPERATOR'
+        )
+    </insert>
+
+    <delete id="deleteUserRole" parameterType="String">
+        delete from TL9_USERROLE where USERID=#{userId}
+    </delete>
+
+    <delete id="deleteUserMedium" parameterType="String">
+        delete from TL9_USERMEDIUM where USERID=#{userId}
+    </delete>
+
+	<select id="selectByUserId" parameterType="java.lang.String" resultMap="user">
+		select
+               u.USERID,
+               u.USERNAME,
+               u.ORGID,
+               o.orgname_cn,
+               o.orglevelid,
+               o.ORGTYPEID,
+               u.USEFLAG,
+               u.EFFECTTIME,
+               m.MEDIUMINFO,
+               m.STATUS,
+               m.MEDIUMINFOLOCKTIME,
+               m.ERRORNUM,
+               m.MEDIUMINFOUPDATETIME,
+               r.ROLEID,
+               r.ROLENAME,
+               r.ROLEDESC
+        from TL9_USERMEDIUM m,tl9_orgbasic o,TL9_USERBASIC u
+        left join TL9_USERROLE ur on u.USERID = ur.USERID and (ur.RECORDSTATUS is null or ur.RECORDSTATUS = '0')
+        left join TL9_ROLEBASIC r on ur.ROLEID = r.ROLEID and (u.RECORDSTATUS is null or u.RECORDSTATUS = '0')
+        where u.USERID = #{id}
+            and u.USERID = m.USERID and m.MEDIUMTYPEID = '1'
+            and o.orgid = u.orgid
+	</select>
+</mapper>

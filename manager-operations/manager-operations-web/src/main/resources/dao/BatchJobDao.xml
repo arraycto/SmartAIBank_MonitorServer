@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.BatchJobDao">
+	<resultMap id="job_summary_info" type="com.dcfs.smartaibank.manager.operations.web.domain.BatchJobExecution">
+		<id property="executionId" column="JOB_EXECUTION_ID"></id>
+		<result property="startTime" column="START_TIME"></result>
+		<result property="endTime" column="END_TIME"></result>
+		<result property="batchExecutionStatus" column="STATUS"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"></result>
+		<result property="tempDate" column="DATE_VAL"></result>
+	</resultMap>
+	<resultMap id="batch_steps_details" type="com.dcfs.smartaibank.manager.operations.web.domain.BatchStepExecution">
+		<id property="executionId" column="STEP_EXECUTION_ID"></id>
+		<result property="stepId" column="STEP_NAME"></result>
+		<result property="startTime" column="START_TIME"></result>
+		<result property="endTime" column="END_TIME"></result>
+		<result property="batchExecutionStatus" column="STATUS"
+				typeHandler="com.dcfs.smartaibank.springboot.core.typehandler.CodeDescEnumTypeHandler"></result>
+	</resultMap>
+	<select id="selectByEntity" resultMap="job_summary_info">
+		SELECT
+		t1.JOB_EXECUTION_ID,
+		t1.START_TIME,
+		t1.END_TIME,
+		t1.STATUS,
+		t3.DATE_VAL
+		FROM
+		BATCH_JOB_EXECUTION t1,
+		BATCH_JOB_INSTANCE t2,
+		BATCH_JOB_EXECUTION_PARAMS t3
+		WHERE
+		t1.JOB_INSTANCE_ID = t2.JOB_INSTANCE_ID
+		AND t1.JOB_EXECUTION_ID = t3.JOB_EXECUTION_ID
+		<if test="params.startTime != null">
+			AND t1.START_TIME <![CDATA[ >= ]]> #{params.startTime, jdbcType=TIMESTAMP }
+		</if>
+		<if test="params.endTime != null">
+			AND t1.START_TIME <![CDATA[ <= ]]> #{params.endTime, jdbcType=TIMESTAMP}
+		</if>
+		<if test="params.batchExecutionStatus != null and params.batchExecutionStatus != ''">
+			and t1.STATUS = #{params.batchExecutionStatus}
+		</if>
+		<if test="params.dataDate != null and params.dataDate != '' ">
+			and TO_CHAR(t3.DATE_VAL - 1,'yyyymmdd') = #{params.dataDate}
+		</if>
+		AND t2.JOB_NAME = 'smartBatchJob'
+		AND t3.KEY_NAME = 'inputDate'
+		ORDER BY
+		t1.CREATE_TIME DESC
+	</select>
+
+	<select id="selectJobStepsByExecutionId" resultMap="batch_steps_details">
+		SELECT
+			t1.STEP_EXECUTION_ID,
+			t1.STEP_NAME,
+			t1.START_TIME,
+			t1.END_TIME,
+			t1.STATUS
+		FROM
+			BATCH_STEP_EXECUTION t1
+		WHERE
+			t1.JOB_EXECUTION_ID = #{executionId}
+		ORDER BY t1.STEP_EXECUTION_ID
+	</select>
+
+	<select id="selectLatestJobExecution" resultType="string">
+		SELECT
+			t.JOB_EXECUTION_ID
+		FROM
+			(
+			SELECT
+				t1.JOB_EXECUTION_ID
+			FROM
+				BATCH_JOB_EXECUTION t1,
+				BATCH_JOB_INSTANCE t2
+			WHERE
+				t1.JOB_INSTANCE_ID = t2.JOB_INSTANCE_ID
+				AND t2.JOB_NAME = 'smartBatchJob'
+				AND trunc( t1.CREATE_TIME ) = trunc( #{nowDate, jdbcType=TIMESTAMP} )
+			ORDER BY
+				t1.CREATE_TIME DESC
+			) t
+		WHERE
+			ROWNUM = 1
+	</select>
+
+	<select id="selectExecutionStatusByExecutionId" resultType="string">
+		SELECT
+			t1.STATUS
+		FROM
+			BATCH_JOB_EXECUTION t1
+		WHERE
+			t1.JOB_EXECUTION_ID = #{executionId}
+	</select>
+
+	<select id="selectOdsDataDate" resultType="date">
+		SELECT
+			t1.DATE_VAL
+		FROM BATCH_JOB_EXECUTION_PARAMS t1
+		WHERE t1.JOB_EXECUTION_ID =  #{executionId}
+		   AND t1.KEY_NAME = 'inputDate'
+	</select>
+
+	<select id="selectStartedBatchJob" resultType="int">
+		SELECT
+			COUNT(1)
+		FROM
+			(
+			SELECT
+				t1.JOB_EXECUTION_ID
+			FROM
+				BATCH_JOB_EXECUTION t1,
+				BATCH_JOB_INSTANCE t2
+			WHERE
+				t1.JOB_INSTANCE_ID = t2.JOB_INSTANCE_ID
+				AND t1.STATUS = 'STARTED'
+				AND t2.JOB_NAME = 'smartBatchJob'
+				AND trunc( t1.CREATE_TIME ) = trunc( #{nowDate, jdbcType=TIMESTAMP} )
+			) t
+	</select>
+
+	<select id="selectUuidByExecutionId" resultType="string">
+		SELECT
+			t1.STRING_VAL
+		FROM BATCH_JOB_EXECUTION_PARAMS t1
+		WHERE t1.JOB_EXECUTION_ID =  #{executionId}
+		   AND t1.KEY_NAME = 'uuid'
+	</select>
+</mapper>

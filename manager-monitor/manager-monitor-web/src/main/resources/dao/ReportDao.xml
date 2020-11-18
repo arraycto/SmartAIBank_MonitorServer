@@ -1,0 +1,923 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.ReportDao">
+	<!-- 查询计划工作时间 -->
+	<select id="queryWorkTime" parameterType="java.util.HashMap"
+		resultType="java.util.HashMap">
+		 select distinct t.device_id as deviceid,
+		to_date(c.calendar_year||'-'||c.calendar_month||'-'||c.calendar_day ||
+		' '||t.start_time||':00','yyyy-mm-dd hh24:mi:ss') as start_time,
+		to_date(c.calendar_year||'-'||c.calendar_month||'-'||c.calendar_day ||
+		' '||t.end_time||':00','yyyy-mm-dd hh24:mi:ss') as end_time,
+		d.branch_no,
+		t.date_class as date_type
+		from tl9_sm_business_timing t
+		inner join tl9_sm_branch_device d on t.device_id = d.deviceid and d.status='1'
+		inner
+		join tl9_qu_work_calendar c on d.branch_no = c.branch_no and
+		c.calendar_type = t.date_class and
+		c.calendar_year||'-'||c.calendar_month||'-'||c.calendar_day = #{REPORT_DATE}
+		order by t.device_id, start_time
+
+	</select>
+
+	<!-- 查询计划停机时间 -->
+	<select id="queryShutDownTime" parameterType="java.util.HashMap"
+		resultType="java.util.HashMap">
+		select *
+		from (
+		select d.TERMINAL_ID as deviceid,
+		d.ORG_ID as branch_no,
+		to_date(d.start_date ||'
+		'||d.start_time||':00','yyyy-mm-dd
+		hh24:mi:ss') as start_time,
+		to_date(d.end_date ||'
+		'||d.end_time||':00','yyyy-mm-dd hh24:mi:ss')
+		as end_time
+		from
+		VTM_DEVICE_DOWNTIME_PLAN d
+		where status = 0
+		order by
+		d.start_date,d.start_time
+		) a
+		where
+		to_char(a.START_TIME,'yyyy-mm-dd')=#{REPORT_DATE}
+		and
+		to_char(a.END_TIME,'yyyy-mm-dd')=#{REPORT_DATE}
+	</select>
+
+	<!-- 查询日报表数据 -->
+	<select id="queryDayReportInfo" parameterType="java.util.HashMap"
+		resultType="java.util.HashMap">
+		select SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME
+		FROM MAS_R_DAY_INFO
+		WHERE to_char(CREATE_TIME,'yyyy-mm-dd')&gt;=#{START_DATE}
+		AND to_char(CREATE_TIME,'yyyy-mm-dd')&lt;=#{END_DATE}
+		AND M_TYPE = #{REPORT_TYPE}
+		ORDER BY CREATE_TIME
+	</select>
+
+	<!-- 查询月报表数据 -->
+	<select id="queryMonthReportInfo" parameterType="java.util.HashMap"
+		resultType="java.util.HashMap">
+		select SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME,
+		R_MONTH,
+		R_YEAR
+		FROM MAS_R_MONTH_INFO
+		WHERE  to_char(CREATE_TIME,'yyyy-mm-dd')&gt;=#{START_DATE}
+		AND to_char(CREATE_TIME,'yyyy-mm-dd')&lt;=#{END_DATE}
+		AND M_TYPE = #{REPORT_TYPE}
+		ORDER BY CREATE_TIME
+	</select>
+
+	<!-- 查询季报表数据 -->
+	<select id="queryPeriodReportInfo" parameterType="java.util.HashMap"
+		resultType="java.util.HashMap">
+		select SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME,
+		R_PERIOD,
+		R_YEAR
+		FROM MAS_R_PERIOD_INFO
+		WHERE to_char(CREATE_TIME,'yyyy-mm-dd')&gt;=#{START_DATE}
+		AND to_char(CREATE_TIME,'yyyy-mm-dd')&lt;=#{END_DATE}
+		AND M_TYPE = #{REPORT_TYPE}
+		ORDER BY R_PERIOD
+	</select>
+
+	<!-- 插入日报表数据 -->
+	<insert id="insertDayReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_DAY_INFO(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME
+		)
+		select
+		'D'||lpad(MAS_R_DAY_INFO_SEQ.nextval, 31, '0') as SEQ_NO,
+		a.* from (
+		<foreach collection="list" item="item" index="index"
+			separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.MNAME},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.FIELD_NO,jdbcType=VARCHAR},
+			#{item.FIELD_NAME,jdbcType=VARCHAR},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.FAULT_TIME_INT},
+			#{item.NORMAL_TIME_INT},
+			#{item.CREATE_TIME}
+			from dual
+		</foreach>
+		) a
+	</insert>
+
+	<!-- 插入月报表数据 -->
+	<insert id="insertMonthReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_MONTH_INFO(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME,
+		R_MONTH,
+		R_YEAR
+		)
+		select 'M'||lpad(MAS_R_MONTH_INFO_SEQ.nextval, 31, '0') as SEQ_NO,
+		m.* from (
+		<foreach collection="list" item="item" index="index"
+			separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.MNAME},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.FIELD_NO,jdbcType=VARCHAR},
+			#{item.FIELD_NAME,jdbcType=VARCHAR},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.FAULT_TIME_INT},
+			#{item.NORMAL_TIME_INT},
+			#{item.CREATE_TIME},
+			#{item.R_MONTH},
+			#{item.R_YEAR}
+			from dual
+		</foreach>
+		) m
+	</insert>
+
+	<!-- 插入季报表数据 -->
+	<insert id="insertPeriodReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_PERIOD_INFO(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME,
+		R_PERIOD,
+		R_YEAR
+		)
+		select
+		'P'||lpad(MAS_R_PERIOD_INFO_SEQ.nextval, 31, '0') as SEQ_NO,
+		p.* from (
+		<foreach collection="list" item="item" index="index"
+			separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.MNAME},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.FIELD_NO,jdbcType=VARCHAR},
+			#{item.FIELD_NAME,jdbcType=VARCHAR},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.FAULT_TIME_INT},
+			#{item.NORMAL_TIME_INT},
+			#{item.CREATE_TIME},
+			#{item.R_PERIOD},
+			#{item.R_YEAR}
+			from dual
+		</foreach>
+		) p
+	</insert>
+
+	<!-- 插入年报表数据 -->
+	<insert id="insertYearReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_YEAR_INFO(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		MNAME,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		FIELD_NO,
+		FIELD_NAME,
+		MANUF_ID,
+		MANUF_NAME,
+		FAULT_TIME_INT,
+		NORMAL_TIME_INT,
+		CREATE_TIME,
+		R_YEAR
+		)
+		select
+		'Y'||lpad(MAS_R_YEAR_INFO_SEQ.nextval, 31, '0') as SEQ_NO,
+		y.* from (
+		<foreach collection="list" item="item" index="index"
+			separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.MNAME},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.FIELD_NO,jdbcType=VARCHAR},
+			#{item.FIELD_NAME,jdbcType=VARCHAR},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.FAULT_TIME_INT},
+			#{item.NORMAL_TIME_INT},
+			#{item.CREATE_TIME},
+			#{item.R_YEAR}
+			from dual
+		</foreach>
+		) y
+	</insert>
+
+	<!-- 删除日报表数据 -->
+	<delete id="deleteDayReport" parameterType="java.util.HashMap">
+		delete from MAS_R_DAY_INFO where to_char(CREATE_TIME,'yyyymmdd') = to_char(#{CREATE_TIME},'yyyymmdd') AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 删除月报表数据 -->
+	<delete id="deleteMonthReport" parameterType="java.util.HashMap">
+		delete from MAS_R_MONTH_INFO where R_MONTH=#{R_MONTH} and R_YEAR=#{R_YEAR} AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 删除季报表数据 -->
+	<delete id="deletePeriodReport" parameterType="java.util.HashMap">
+		delete from MAS_R_PERIOD_INFO where R_PERIOD=#{R_PERIOD} and R_YEAR=#{R_YEAR}  AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 删除年报表数据 -->
+	<delete id="deleteYearReport" parameterType="java.util.HashMap">
+		delete from MAS_R_YEAR_INFO where R_YEAR=#{R_YEAR}  AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 插入石嘴山日报表数据 add by qiuch-->
+	<insert id="insertSzsDayReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_DAY_REPORT(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		MANUF_ID,
+		MANUF_NAME,
+		DIFFER_TIME_INT,
+		OCCUR_COUNT,
+		CREATE_TIME,
+		ALARM_LEVEL,
+		CYCLE_ID,
+		RESOURCE_CODE,
+		RESOURCE_NAME,
+		RESOURCE_CHANEL,
+		TRAN_STATUS,
+		TELLER_NO
+		)
+		select
+		'D'||lpad(MAS_R_DAY_REPORT_SEQ.nextval, 31, '0') as SEQ_NO,
+		a.* from (
+		<foreach collection="list" item="item" index="index"
+				 separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.DIFFER_TIME_INT},
+			#{item.OCCUR_COUNT},
+			#{item.CREATE_TIME},
+			#{item.ALARM_LEVEL},
+			#{item.CYCLE_ID},
+			#{item.RESOURCE_CODE},
+			#{item.RESOURCE_NAME},
+			#{item.RESOURCE_CHANEL},
+			#{item.TRAN_STATUS},
+			#{item.TELLER_NO}
+			from dual
+		</foreach>
+		) a
+	</insert>
+
+	<!-- 插入石嘴山月报表数据 add by qiuch-->
+	<insert id="insertSzsMonthReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_MONTH_REPORT(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		MANUF_ID,
+		MANUF_NAME,
+		DIFFER_TIME_INT,
+		OCCUR_COUNT,
+		CREATE_TIME,
+		ALARM_LEVEL,
+		CYCLE_ID,
+		RESOURCE_CODE,
+		RESOURCE_NAME,
+		RESOURCE_CHANEL,
+		TRAN_STATUS,
+		TELLER_NO,
+		R_MONTH,
+		R_YEAR
+		)
+		select
+		'M'||lpad(MAS_R_MONTH_REPORT_SEQ.nextval, 31, '0') as SEQ_NO,
+		m.* from (
+		<foreach collection="list" item="item" index="index"
+				 separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.DIFFER_TIME_INT},
+			#{item.OCCUR_COUNT},
+			#{item.CREATE_TIME},
+			#{item.ALARM_LEVEL},
+			#{item.CYCLE_ID},
+			#{item.RESOURCE_CODE},
+			#{item.RESOURCE_NAME},
+			#{item.RESOURCE_CHANEL},
+			#{item.TRAN_STATUS},
+			#{item.TELLER_NO},
+			#{item.R_MONTH},
+			#{item.R_YEAR}
+			from dual
+		</foreach>
+		) m
+	</insert>
+
+	<!-- 插入石嘴山季报表数据 add by qiuch-->
+	<insert id="insertSzsPeriodReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_PERIOD_REPORT(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		MANUF_ID,
+		MANUF_NAME,
+		DIFFER_TIME_INT,
+		OCCUR_COUNT,
+		CREATE_TIME,
+		ALARM_LEVEL,
+		CYCLE_ID,
+		RESOURCE_CODE,
+		RESOURCE_NAME,
+		RESOURCE_CHANEL,
+		TRAN_STATUS,
+		TELLER_NO,
+		R_PERIOD,
+		R_YEAR
+		)
+		select
+		'Q'||lpad(MAS_R_PERIOD_REPORT_SEQ.nextval, 31, '0') as SEQ_NO,
+		q.* from (
+		<foreach collection="list" item="item" index="index"
+				 separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.DIFFER_TIME_INT},
+			#{item.OCCUR_COUNT},
+			#{item.CREATE_TIME},
+			#{item.ALARM_LEVEL},
+			#{item.CYCLE_ID},
+			#{item.RESOURCE_CODE},
+			#{item.RESOURCE_NAME},
+			#{item.RESOURCE_CHANEL},
+			#{item.TRAN_STATUS},
+			#{item.TELLER_NO},
+			#{item.R_PERIOD},
+			#{item.R_YEAR}
+			from dual
+		</foreach>
+		) q
+	</insert>
+
+	<!-- 插入石嘴山年报表数据 add by qiuch-->
+	<insert id="insertSzsYearReport" parameterType="java.util.List">
+		INSERT INTO MAS_R_YEAR_REPORT(
+		SEQ_NO,
+		BRANCH_NO,
+		BRANCH_NAME,
+		M_TYPE,
+		MID,
+		MAC,
+		DEVMODELKEY,
+		DEVCLASSKEY,
+		DEVCLASSNAME,
+		MMODELKEY,
+		MCLASSKEY,
+		MCLASSNAME,
+		MANUF_ID,
+		MANUF_NAME,
+		DIFFER_TIME_INT,
+		OCCUR_COUNT,
+		CREATE_TIME,
+		ALARM_LEVEL,
+		CYCLE_ID,
+		RESOURCE_CODE,
+		RESOURCE_NAME,
+		RESOURCE_CHANEL,
+		TRAN_STATUS,
+		TELLER_NO,
+		R_YEAR
+		)
+		select
+		'Y'||lpad(MAS_R_YEAR_REPORT_SEQ.nextval, 31, '0') as SEQ_NO,
+		y.* from (
+		<foreach collection="list" item="item" index="index"
+				 separator="UNION">
+			SELECT
+			#{item.BRANCH_NO},
+			#{item.BRANCH_NAME},
+			#{item.M_TYPE},
+			#{item.MID},
+			#{item.MAC},
+			#{item.DEVMODELKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSKEY,jdbcType=VARCHAR},
+			#{item.DEVCLASSNAME,jdbcType=VARCHAR},
+			#{item.MMODELKEY},
+			#{item.MCLASSKEY},
+			#{item.MCLASSNAME},
+			#{item.MANUF_ID,jdbcType=VARCHAR},
+			#{item.MANUF_NAME,jdbcType=VARCHAR},
+			#{item.DIFFER_TIME_INT},
+			#{item.OCCUR_COUNT},
+			#{item.CREATE_TIME},
+			#{item.ALARM_LEVEL},
+			#{item.CYCLE_ID},
+			#{item.RESOURCE_CODE},
+			#{item.RESOURCE_NAME},
+			#{item.RESOURCE_CHANEL},
+			#{item.TRAN_STATUS},
+			#{item.TELLER_NO},
+			#{item.R_YEAR}
+			from dual
+		</foreach>
+		) y
+	</insert>
+
+	<!-- 查询石嘴山日报表数据 -->
+	<select id="querySzsDayReportInfo" parameterType="java.util.HashMap"
+			resultType="java.util.HashMap">
+		select  SEQ_NO,
+				MAC,
+				DEVMODELKEY,
+				DEVCLASSKEY,
+				DEVCLASSNAME,
+				BRANCH_NO,
+				BRANCH_NAME,
+				MID,
+				MMODELKEY,
+				MCLASSKEY,
+				MCLASSNAME,
+				MANUF_ID,
+				MANUF_NAME,
+				M_TYPE,
+				DIFFER_TIME_INT,
+				OCCUR_COUNT,
+				CREATE_TIME,
+				CYCLE_ID,
+				RESOURCE_CODE,
+				RESOURCE_NAME,
+				RESOURCE_CHANEL,
+				TRAN_STATUS,
+				ALARM_LEVEL,
+				TELLER_NO
+			FROM MAS_R_DAY_REPORT
+		WHERE to_char(CREATE_TIME,'yyyy-mm-dd')&gt;=#{START_DATE}
+				AND to_char(CREATE_TIME,'yyyy-mm-dd')&lt;=#{END_DATE}
+				AND M_TYPE = #{REPORT_TYPE}
+		ORDER BY CREATE_TIME
+	</select>
+
+	<!-- 查询石嘴山月报表数据 -->
+	<select id="querySzsMonthReportInfo" parameterType="java.util.HashMap"
+			resultType="java.util.HashMap">
+		select  SEQ_NO,
+				MAC,
+				DEVMODELKEY,
+				DEVCLASSKEY,
+				DEVCLASSNAME,
+				BRANCH_NO,
+				BRANCH_NAME,
+				MID,
+				MMODELKEY,
+				MCLASSKEY,
+				MCLASSNAME,
+				MANUF_ID,
+				MANUF_NAME,
+				M_TYPE,
+				DIFFER_TIME_INT,
+				OCCUR_COUNT,
+				CREATE_TIME,
+				CYCLE_ID,
+				RESOURCE_CODE,
+				RESOURCE_NAME,
+				RESOURCE_CHANEL,
+				TRAN_STATUS,
+				ALARM_LEVEL,
+				TELLER_NO
+			FROM MAS_R_MONTH_REPORT
+		WHERE to_char(CREATE_TIME,'yyyy-mm-dd')&gt;=#{START_DATE}
+				AND to_char(CREATE_TIME,'yyyy-mm-dd')&lt;=#{END_DATE}
+				AND M_TYPE = #{REPORT_TYPE}
+		ORDER BY CREATE_TIME
+	</select>
+
+	<!-- 查询石嘴山季报表数据 -->
+	<select id="querySzsPeriodReportInfo" parameterType="java.util.HashMap"
+			resultType="java.util.HashMap">
+		select  SEQ_NO,
+				MAC,
+				DEVMODELKEY,
+				DEVCLASSKEY,
+				DEVCLASSNAME,
+				BRANCH_NO,
+				BRANCH_NAME,
+				MID,
+				MMODELKEY,
+				MCLASSKEY,
+				MCLASSNAME,
+				MANUF_ID,
+				MANUF_NAME,
+				M_TYPE,
+				DIFFER_TIME_INT,
+				OCCUR_COUNT,
+				CREATE_TIME,
+				CYCLE_ID,
+				RESOURCE_CODE,
+				RESOURCE_NAME,
+				RESOURCE_CHANEL,
+				TRAN_STATUS,
+				ALARM_LEVEL,
+				TELLER_NO
+			FROM MAS_R_PERIOD_REPORT
+		WHERE to_char(CREATE_TIME,'yyyy-mm-dd')&gt;=#{START_DATE}
+				AND to_char(CREATE_TIME,'yyyy-mm-dd')&lt;=#{END_DATE}
+				AND M_TYPE = #{REPORT_TYPE}
+		ORDER BY CREATE_TIME
+	</select>
+
+	<!-- 删除石嘴山日报表数据 -->
+	<delete id="deleteSzsDayReport" parameterType="java.util.HashMap">
+		delete from MAS_R_DAY_REPORT where to_char(CREATE_TIME,'yyyymmdd') = to_char(#{CREATE_TIME},'yyyymmdd') AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 删除石嘴山月报表数据 -->
+	<delete id="deleteSzsMonthReport" parameterType="java.util.HashMap">
+		delete from MAS_R_MONTH_REPORT where R_MONTH=#{R_MONTH} and R_YEAR=#{R_YEAR} AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 删除石嘴山季报表数据 -->
+	<delete id="deleteSzsPeriodReport" parameterType="java.util.HashMap">
+		delete from MAS_R_PERIOD_REPORT where R_PERIOD=#{R_PERIOD} and R_YEAR=#{R_YEAR}  AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 删除石嘴山年报表数据 -->
+	<delete id="deleteSzsYearReport" parameterType="java.util.HashMap">
+		delete from MAS_R_YEAR_REPORT where R_YEAR=#{R_YEAR}  AND M_TYPE=#{M_TYPE}
+	</delete>
+
+	<!-- 查询错账记录  add by qiuch 20170515-->
+	<select id="queryAccountDeal" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT t.*,t.DEVICE_ID AS MID,d.branch_no,c.orgname_cn as branch_name FROM MAS_ACCOUNT_DEAL_INFO t
+			INNER JOIN TL9_SM_BRANCH_DEVICE d ON t.device_id=d.deviceid
+			INNER JOIN TL9_ORGBASIC c ON c.orgid=d.branch_no
+		WHERE t.ACCOUNT_NUM != '0' and
+			to_char(T.START_TIME,'yyyyMMdd') = #{REPORT_DATE}
+	</select>
+
+	<!-- 查询自助机具交易记录  add by qiuch -->
+	<select id="queryDevTran" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		  <!--
+		SELECT a.Opt_Org AS BRANCH_NO, g.ORGNAME_CN AS BRANCH_NAME, a.Opt_Date,a.Func,g.FUNC as RESOURCE_CODE,c.RESOURCENAME AS RESOURCE_NAME,
+         (case
+          when a.RET_CODE='000000' or a.RET_CODE='00' or a.RET_CODE='0000' then 'S'
+          else 'F' END) AS TRAN_STATUS,
+          sysdate AS START_TIME,
+		  sysdate AS END_TIME
+          FROM TL9_BUSINESS_JOURNALA a
+          INNER JOIN (with a as (select * from mas_monitor_config where TYPE_NO='REPORTPARAM' and CODE_NO='TRAN_TYPE')
+							select regexp_substr(a.CODE_VALUE,'[^\]+',1,level) as func from a
+							connect by level &lt;=regexp_count(a.CODE_VALUE,'\\')+1
+					) g ON a.FUNC IN (select RESOURCEID from TL9_RESOURCEBASIC
+								   			start with RESOURCEID = g.FUNC
+								   			connect by  prior RESOURCEID = PARENT
+								   			)
+           INNER JOIN TL9_RESOURCEBASIC c ON g.FUNC = c.RESOURCEID
+           INNER JOIN TL9_ORGBASIC g ON a.Opt_Org = g.ORGID
+		 where to_char(a.Opt_Date,'yyyymmdd') = #{REPORT_DATE}
+			-->
+		SELECT
+		a.BRANCH_NO AS BRANCH_NO,
+		g.ORGNAME_CN AS BRANCH_NAME,
+		a.RUN_DATE,
+		a.PROGRAM_ID,
+		g.FUNC AS RESOURCE_CODE,
+		c.RESOURCENAME AS RESOURCE_NAME,
+		(
+		CASE
+		WHEN a.RET_CODE = '000000'
+		OR a.RET_CODE = '00'
+		OR a.RET_CODE = '0000' THEN 'S'
+		ELSE 'F'
+		END
+		) AS TRAN_STATUS,
+		SYSDATE AS START_TIME,
+		SYSDATE AS END_TIME
+		FROM
+		BSM_MAIN_SQL a
+		INNER JOIN (
+		WITH a AS (
+		SELECT
+		*
+		FROM
+		mas_monitor_config
+		WHERE
+		TYPE_NO = 'REPORTPARAM'
+		AND CODE_NO = 'TRAN_TYPE'
+		) SELECT
+		REGEXP_SUBSTR( a.CODE_VALUE, '[^\]+', 1, LEVEL ) AS func
+		FROM
+		a
+		CONNECT BY
+		LEVEL &lt;= REGEXP_COUNT( a.CODE_VALUE, '\\' )+ 1
+		) g ON
+		a.PROGRAM_ID IN (
+		SELECT
+		RESOURCEID
+		FROM
+		TL9_RESOURCEBASIC
+		START WITH
+		RESOURCEID = g.FUNC
+		CONNECT BY
+		PRIOR RESOURCEID = PARENT
+		)
+		INNER JOIN TL9_RESOURCEBASIC c ON
+		g.FUNC = c.RESOURCEID
+		INNER JOIN TL9_ORGBASIC g ON
+		a.BRANCH_NO = g.ORGID
+		WHERE
+		TO_CHAR( a.RUN_DATE, 'yyyymmdd' ) = #{REPORT_DATE}
+	</select>
+
+	<!-- 查询设备管理员响应记录  add by qiuch -->
+	<select id="queryManagerAnswer" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT MDAI.*,MADI.CLOSE_TYPE,
+			MDAI.ALARM_DATE AS START_TIME,
+			MADI.BEGIN_TIME AS END_TIME
+		FROM MAS_DEVICE_ALARM_INFO MDAI
+    		LEFT JOIN MAS_ALARM_DEAL_INFO MADI ON MDAI.ID = MADI.ALARM_ID
+		WHERE to_char(MDAI.ALARM_DATE,'yyyymmdd') =#{REPORT_DATE}
+          and MADI.BEGIN_TIME IS NOT NULL and (MADI.CLOSE_TYPE IS NULL OR MADI.CLOSE_TYPE='2')
+		ORDER BY MDAI.ALARM_DATE
+	</select>
+
+	<!-- 查询设备管理员处理记录  add by qiuch -->
+	<select id="queryManagerDeal" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT MDAI.*,
+			MADI.BEGIN_TIME AS START_TIME,
+			MADI.END_TIME AS END_TIME
+		FROM MAS_ALARM_DEAL_INFO MADI
+    		RIGHT JOIN MAS_DEVICE_ALARM_INFO MDAI ON MDAI.ID = MADI.ALARM_ID
+		WHERE to_char(MADI.BEGIN_TIME,'yyyymmdd') =#{REPORT_DATE}
+			  AND (MADI.CLOSE_TYPE IS NULL OR MADI.CLOSE_TYPE='2')
+		ORDER BY MADI.BEGIN_TIME
+	</select>
+
+
+
+	<!-- 查询设备费用  add by qiuch -->
+	<select id="queryDevCost" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select x.device_id as mid ,sum(cost) as cost,e.BRANCH_NO, o.orgname_cn as branch_name,e.devclasskey as mclasskey,c.devclassname as mclassname ,
+			A2.MANUFACTURERID AS MANUF_ID,A2.NAME as MANUF_NAME,sysdate AS START_TIME,sysdate AS END_TIME
+		from
+      (
+		  select a.device_id,a.price/(a.end_date-a.start_date) as cost
+			from tl9_sm_device_archives a
+			where to_date(#{REPORT_DATE},'yyyymmdd') between a.start_date and a.end_date
+      UNION
+		  select a.device_id,a.price/(a.end_date-a.start_date) as cost
+			from tl9_sm_device_maintenance a
+			where to_date(#{REPORT_DATE},'yyyymmdd') between a.start_date and a.end_date
+      union
+			select a.device_id,a.price as cost
+			from tl9_sm_device_maintenance a
+			where to_date(#{REPORT_DATE},'yyyymmdd') =a.operate_date
+      ) x
+      inner join tl9_sm_branch_device e on e.deviceid=x.device_id
+      LEFT JOIN TL9_DEVICE_CLASS c
+			ON c.DEVCLASSKEY=e.DEVCLASSKEY
+	  LEFT JOIN TL9_ORGBASIC o
+			ON o.ORGID=e.BRANCH_NO
+      LEFT JOIN (SELECT X1.MANUFACTURERID,X1.NAME,X2.DEVMODELKEY
+           FROM TL9_DEVICE_MANUFACTURER X1,
+               TL9_DEVICE_MAINTENANCE X2,
+               TL9_DEVICE_MAINTAINER X3
+                  WHERE X3.MAINTAINERID=X2.MAINTAINERID AND X1.MANUFACTURERID=X3.MANUFACTURERID) A2
+          ON e.DEVMODELKEY=A2.DEVMODELKEY
+      group by x.device_id,e.devclasskey,c.devclassname,A2.MANUFACTURERID,A2.NAME,e.BRANCH_NO, o.orgname_cn
+	</select>
+
+	<!-- 查询设备耗材 -->
+	<select id="queryDevSupply" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		 select o.id,o.branch_no,o.branch_name,o.mid,o.devmodelkey,o.description,o.mclasskey,o.mclassname,o.manuf_id,o.manuf_name,
+		 round(to_number(o.end_time-o.start_time)*1440) as DIFFER_TIME_INT,1 as OCCUR_COUNT,'DEVSUPPLY' AS M_TYPE, o.alarm_date as CREATE_TIME
+		 from (
+               select o.id,o.branch_no,o.branch_name,o.mid,o.devmodelkey,o.description,o.alarm_date,o.mclasskey,o.mclassname,o.manuf_id,o.manuf_name,i.end_time as start_time,nvl(lead(end_time,1) over(partition by mid order by end_time),sysdate) as end_time
+               from mas_device_alarm_info o left join
+                mas_alarm_deal_info i on o.id=i.alarm_id
+                           where o.alarm_status>=4 and o.rule_id='A000011' and
+                                 to_char(i.end_time,'yyyy-mm-dd')&gt;=#{START_DATE}
+				AND to_char(i.end_time,'yyyy-mm-dd')&lt;=#{END_DATE}
+        ) o
+	</select>
+</mapper>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.analyzer.dao.AutoAlarmCloseDao">
+	<select id="queryAlarmInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+            ID
+        FROM
+            MAS_DEVICE_ALARM_INFO
+        WHERE
+            ALARM_STATUS = 4
+            and end_time is not null
+            and TRUNC (end_time + (select to_number(code_value) from  MAS_MONITOR_CONFIG where code_no ='NETWORK_DELAY'))
+                       >= to_date(#{nowTime},'yyyy-MM-dd HH24:mi:ss')
+	</select>
+	<update id="updateAlarm" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_DEVICE_ALARM_INFO
+		SET
+			ALARM_STATUS=#{ALARM_STATUS},
+			CLOSE_TIME = #{CLOSE_TIME},
+			CLOSE_TYPE = #{CLOSE_TYPE}
+		WHERE ID = #{ID}
+	</update>
+
+	<!-- 删除设备预警信息数据 -->
+	<delete id="clearDeviceAlarmData">
+	  DELETE FROM mas_device_alarm_info
+      WHERE     (mac, branch_no) NOT IN (SELECT DISTINCT b.MAC, b.branch_no
+                                           FROM TL9_SM_BRANCH_DEVICE b where b.status = '1')
+	</delete>
+
+	<!-- 删除交易预警信息数据 -->
+	<delete id="clearTranAlarmData">
+		DELETE FROM mas_tran_alarm_info
+      WHERE     (MID, branch_no) NOT IN (SELECT DISTINCT b.DEVICEID, b.branch_no
+                                           FROM TL9_SM_BRANCH_DEVICE b where = '1')
+	</delete>
+
+	<!-- 删除故障处理数据 -->
+	<delete id="clearFaultRecordData">
+		DELETE FROM MAS_R_DEVICE_FAULT
+      	WHERE     (MAC, branch_no) NOT IN (SELECT DISTINCT b.MAC, b.branch_no
+                                           FROM TL9_SM_BRANCH_DEVICE b where b.status = '1')
+	</delete>
+</mapper>

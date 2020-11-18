@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.web.dao.MonitorDeviceDao">
+    <!-- 设备信息列表展示详情 -->
+    <resultMap id="device_detail" type="com.dcfs.smartaibank.manager.monitor.web.domian.DeviceDetail">
+        <result property="id" column="MID"></result>
+        <result property="mac" column="MAC"></result>
+        <result property="ip" column="IP"></result>
+        <result property="totalStatus" column="M_STATUS"></result>
+        <result property="totalStatusDesc" column="STATUS_DESC"></result>
+        <result property="commStatus" column="NETWORK_STATUS"></result>
+        <result property="commStatusDesc" column="NETWORK_STATUS_DESC"></result>
+        <result property="commStatusTime" column="NETWORK_TIME"></result>
+        <result property="appStatus" column="APP_STATUS"></result>
+        <result property="appStatusDesc" column="APP_STATUS_DESC"></result>
+        <result property="appStatusTime" column="APP_TIME"></result>
+        <result property="peripheralStatus" column="PERIPHERAL_STATUS"></result>
+        <result property="peripheralStatusDesc" column="PERIPHERAL_STATUS_DESC"></result>
+        <result property="peripheralStatusTime" column="PERIPHERAL_TIME"></result>
+        <result property="devClassKey" column="MCLASSKEY"></result>
+        <result property="deviceTypeName" column="MCLASSNAME"></result>
+        <result property="branchNo" column="BRANCH_NO"></result>
+        <result property="branchName" column="BRANCH_NAME"></result>
+        <result property="manufacturerId" column="MANUF_ID"></result>
+        <result property="manufacturerName" column="MANUF_NAME"></result>
+        <result property="receiveTime" column="RECEIVE_TIME"></result>
+        <result property="fieldId" column="FIELD_NO"></result>
+        <result property="fieldName" column="FIELD_NAME"></result>
+        <result property="devModelKey" column="MMODELKEY"></result>
+        <result property="devModelName" column="DEVMODELNAME"></result>
+        <collection property="devicePeripheral" javaType="List"
+                    ofType="com.dcfs.smartaibank.manager.monitor.web.domian.PeripheralStatus">
+            <result property="peripheralName" column="DEVCLASSNAME"></result>
+            <result property="peripheralStatus" column="DEVICE_STATUS"></result>
+            <result property="peripheralStatusDetail" column="DETAIL" jdbcType="CLOB"
+                    javaType="java.lang.String"></result>
+
+        </collection>
+    </resultMap>
+    <!-- 设备远程操作记录 -->
+    <resultMap id="remote_opt_recode" type="com.dcfs.smartaibank.manager.monitor.web.domian.RemoteOperationRecode">
+        <result property="deviceID" column="DEVICEID"></result>
+        <result property="deviceClassKey" column="DEVCLASSKEY"></result>
+        <result property="deviceClassName" column="DEVCLASSNAME"></result>
+        <result property="branchId" column="ORGID"></result>
+        <result property="branchName" column="ORGNAME_CN"></result>
+        <result property="operatorId" column="USERID"></result>
+        <result property="operatorName" column="USERNAME"></result>
+        <result property="operationInstruction" column="CONTROLMSG"></result>
+        <result property="operationContent" column="CONTROLNAME"></result>
+        <result property="operationResultId" column="STATUS"></result>
+        <result property="operationResultDesc" column="STATUS_NAME"></result>
+        <result property="operationTime" column="BEGIN_TIME"></result>
+        <result property="operationDate" column="BEGIN_DATE"></result>
+        <result property="finishTime" column="FINISH_TIME"></result>
+    </resultMap>
+    <!-- 外设状态 -->
+    <resultMap id="peripheral_status" type="com.dcfs.smartaibank.manager.monitor.web.domian.PeripheralStatus">
+        <result property="peripheralName" column="DEVCLASSNAME"></result>
+        <result property="peripheralStatus" column="DEVICE_STATUS"></result>
+        <result property="peripheralStatusDetail" column="DETAIL" jdbcType="CLOB" javaType="java.lang.String"></result>
+    </resultMap>
+    <!-- 设备运行汇总信息，各种状态的数量及占比 -->
+    <sql id="status_gather_final_column">
+       c.totalCount,
+       c.commFailureCount,
+       c.appNotStartedCount,
+       c.alarmCount,
+       c.peripheralFailureCount,
+       c.normalCount,
+       c.unmonitoredCount,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.commFailureCount / c.totalCount, 4) * 100
+       END
+          commFailureRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.appNotStartedCount / c.totalCount, 4) * 100
+       END
+          appNotStartedRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.alarmCount / c.totalCount, 4) * 100
+       END
+          alarmRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.peripheralFailureCount / c.totalCount, 4) * 100
+       END
+          peripheralFailureRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.normalCount / c.totalCount, 4) * 100
+       END
+          normalRate,
+       CASE c.totalCount
+          WHEN 0 THEN 0
+          ELSE ROUND (c.unmonitoredCount / c.totalCount, 4) * 100
+       END
+          unmonitoredRate
+    </sql>
+    <!-- 查询设备运行各种状态的数量 -->
+    <sql id="select_status_temp_count">
+        SELECT COUNT (CASE WHEN aa.M_STATUS = 5 THEN 1 ELSE NULL END)
+        AS commFailureCount,
+        COUNT (CASE WHEN aa.M_STATUS = 4 THEN 1 ELSE NULL END)
+        AS peripheralFailureCount,
+        COUNT (CASE WHEN aa.M_STATUS = 3 THEN 1 ELSE NULL END) AS alarmCount,
+        COUNT (CASE WHEN aa.M_STATUS = 2 THEN 1 ELSE NULL END)
+        AS appNotStartedCount,
+        COUNT (CASE WHEN aa.M_STATUS = 1 THEN 1 ELSE NULL END) AS normalCount,
+        COUNT (CASE WHEN aa.M_STATUS = 0 THEN 1 ELSE NULL END) AS unmonitoredCount,
+        COUNT (aa.MAC) AS totalCount
+        FROM (SELECT DISTINCT bb.MAC, bb.M_STATUS
+        FROM MAS_DEVICE_INFO_SUM bb,
+        TL9_SM_BRANCH_DEVICE dd,
+        MAS_MCLASS_MONITOR mm
+        WHERE mm.ACTIVE = 1
+        AND dd.STATUS = '1'
+        AND bb.MID = dd.DEVICEID
+        AND mm.MCLASSKEY = dd.DEVCLASSKEY
+        <choose>
+            <!-- 如果是营业机构，那么直接查询机构id和传入机构id相等的数据-->
+            <when test="branchStatsType==1">
+                AND bb.branch_no=#{branchId,jdbcType=VARCHAR}
+            </when>
+            <!-- 如果是管理机构，那么查询其下属机构的所有数据-->
+            <otherwise>
+                AND (bb.branch_no IN
+                ( SELECT orgid
+                FROM tl9_orgbasic t
+                START WITH t.orgid = #{branchId,jdbcType=VARCHAR} AND t.orgstatustypeid != '0'
+                CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.orgid AND t.orgstatustypeid != '0'))
+            </otherwise>
+        </choose>
+        <if test="deviceRunningQueryParams.deviceModelKey!=null and deviceRunningQueryParams.deviceModelKey!='' ">
+            AND bb.MCLASSKEY= #{deviceRunningQueryParams.deviceModelKey}
+        </if>
+        <if test="deviceRunningQueryParams.deviceClassKey!=null and deviceRunningQueryParams.deviceClassKey!='' ">
+            AND bb.MMODELKEY= #{deviceRunningQueryParams.deviceClassKey}
+        </if>
+        <if test="deviceRunningQueryParams.deviceId!=null and deviceRunningQueryParams.deviceId!='' ">
+            AND instr(bb.MID, #{deviceRunningQueryParams.deviceId})>0
+        </if>
+        <if test="deviceRunningQueryParams.manufacturerId!=null and deviceRunningQueryParams.manufacturerId!='' ">
+            AND bb.MANUF_ID= #{deviceRunningQueryParams.manufacturerId}
+        </if>
+        ) aa
+
+    </sql>
+    <!-- 设备详情查询排序条件 -->
+    <sql id="device_detail_order_rule">
+        <choose>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.DeviceDetailsSortRuleEnum@isEquals('TOTAL_STATUS',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.M_STATUS desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.M_STATUS asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.DeviceDetailsSortRuleEnum@isEquals('COMM_STATUS',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.NETWORK_STATUS desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.NETWORK_STATUS asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.DeviceDetailsSortRuleEnum@isEquals('APP_STATUS',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.APP_STATUS desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.APP_STATUS asc
+                    </otherwise>
+                </choose>
+            </when>
+            <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.DeviceDetailsSortRuleEnum@isEquals('PERIPHERAL_STATUS',sortRule)">
+                <choose>
+                    <when test="@com.dcfs.smartaibank.manager.monitor.web.enums.SortOrderEnum@isEquals('DESC',sortOrder)">
+                        ORDER BY temp.PERIPHERAL_STATUS desc
+                    </when>
+                    <otherwise>
+                        ORDER BY temp.PERIPHERAL_STATUS asc
+                    </otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                ORDER BY org.ROWID, temp.MID
+            </otherwise>
+        </choose>
+    </sql>
+    <!-- 设备详情查询过滤条件 -->
+    <sql id="device_detail_query_condition">
+        <if test="deviceRunningQueryParams.deviceModelKey!=null and deviceRunningQueryParams.deviceModelKey!='' ">
+            AND temp.MCLASSKEY= #{deviceRunningQueryParams.deviceModelKey,jdbcType=VARCHAR}
+        </if>
+        <if test="deviceRunningQueryParams.deviceClassKey!=null and deviceRunningQueryParams.deviceClassKey!='' ">
+            AND temp.MMODELKEY= #{deviceRunningQueryParams.deviceClassKey,jdbcType=VARCHAR}
+        </if>
+        <if test="deviceRunningQueryParams.deviceId!=null and deviceRunningQueryParams.deviceId != '' ">
+            AND instr(temp.MID,#{deviceRunningQueryParams.deviceId,jdbcType=VARCHAR})>0
+        </if>
+        <if test="deviceRunningQueryParams.manufacturerId!=null and deviceRunningQueryParams.manufacturerId != ''">
+            AND temp.MANUF_ID= #{deviceRunningQueryParams.manufacturerId,jdbcType=VARCHAR}
+        </if>
+        <if test="deviceRunningQueryParams.deviceStatus!=null">
+            AND temp.M_STATUS= #{deviceRunningQueryParams.deviceStatus,jdbcType=INTEGER}
+        </if>
+    </sql>
+    <!-- 查询设备运行汇总信息(包含营业机构和管理机构) -->
+    <select id="selectEachStatusCountGatherInfo"
+            resultType="com.dcfs.smartaibank.manager.monitor.web.domian.DeviceRunningStatusSum">
+        SELECT
+        <include refid="status_gather_final_column"></include>
+        FROM
+        (<include refid="select_status_temp_count"></include> ) c
+    </select>
+
+    <!-- 查询设备详情列表 -->
+    <select id="selectDeviceDetailList" resultMap="device_detail">
+        SELECT temp.*
+        FROM tl9_orgbasic org
+        LEFT OUTER JOIN
+        (SELECT bb.MAC,
+        bb.BRANCH_NO,
+        bb.MID,
+        bb.MNAME,
+        bb.MMODELKEY,
+        dm.DEVMODELNAME,
+        bb.MCLASSKEY,
+        bb.MCLASSNAME,
+        bb.FIELD_NO,
+        bb.FIELD_NAME,
+        bb.M_STATUS,
+        CASE
+        WHEN bb.M_STATUS = '0' THEN '未监控'
+        WHEN bb.M_STATUS = '1' THEN '正常'
+        WHEN bb.M_STATUS = '2' THEN '应用未启动'
+        WHEN bb.M_STATUS = '3' THEN '告警'
+        WHEN bb.M_STATUS = '4' THEN '外设故障'
+        WHEN bb.M_STATUS = '5' THEN '通讯故障'
+        END AS STATUS_DESC,
+        bb.MANUF_ID,
+        bb.MANUF_NAME,
+        bb.RECEIVE_TIME,
+        bb.BRANCH_NAME,
+        bb.MTYPEKEY,
+        bb.MTYPENAME,
+        bb.NETWORK_STATUS,
+        bb.APP_STATUS,
+        bb.PERIPHERAL_STATUS,
+        CASE
+        WHEN bb.NETWORK_STATUS = '1' THEN '正常'
+        WHEN bb.NETWORK_STATUS = '2' THEN '告警'
+        WHEN bb.NETWORK_STATUS = '3' THEN '异常'
+        END AS NETWORK_STATUS_DESC,
+        CASE
+        WHEN bb.APP_STATUS = '1' THEN '正常'
+        WHEN bb.APP_STATUS = '2' THEN '告警'
+        WHEN bb.APP_STATUS = '3' THEN '异常'
+        END AS APP_STATUS_DESC,
+        CASE
+        WHEN bb.PERIPHERAL_STATUS = '1' THEN '正常'
+        WHEN bb.PERIPHERAL_STATUS = '2' THEN '告警'
+        WHEN bb.PERIPHERAL_STATUS = '3' THEN '异常'
+        END AS PERIPHERAL_STATUS_DESC,
+        dd.IP
+        FROM MAS_DEVICE_INFO_SUM bb,
+        TL9_SM_BRANCH_DEVICE dd,
+        MAS_MCLASS_MONITOR mm,
+        TL9_DEVICE_MODEL dm
+        WHERE mm.ACTIVE = 1
+        AND dd.STATUS = '1'
+        AND bb.MID = dd.DEVICEID
+        AND mm.MCLASSKEY = dd.DEVCLASSKEY
+        AND dm.DEVMODELKEY = bb.MMODELKEY
+        AND (bb.branch_no IN
+        ( SELECT orgid
+        FROM tl9_orgbasic t
+        START WITH t.orgid = #{branchId,jdbcType=VARCHAR}
+        AND t.orgstatustypeid != '0'
+        CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.orgid
+        AND t.orgstatustypeid != '0'))) temp
+        ON ORG.ORGID = temp.BRANCH_NO
+        WHERE temp.MAC IS NOT NULL
+        <include refid="device_detail_query_condition"></include>
+        <include refid="device_detail_order_rule"></include>
+    </select>
+    <!-- 查询全部的远程操作记录 -->
+    <select id="selectAllRemoteInfo" resultMap="remote_opt_recode">
+        SELECT A.SEQ,
+        A.MAC,
+        C.branch_no ORGID,
+        B.ORGNAME_CN,
+        C.DEVICEID,
+        D.DEVCLASSKEY,
+        D.DEVCLASSNAME,
+        A.USERID,
+        NVL (E.USERNAME, a.userid) USERNAME,
+        to_date(A.BEGIN_DATE || ' ' || A.BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss') AS BEGIN_TIME,
+        CASE
+          WHEN A.FINISH_DATE IS NOT NULL  THEN
+            to_date(A.FINISH_DATE || ' ' || A.FINISH_TIME,'yyyy-mm-dd hh24:mi:ss')
+          ELSE NULL
+        END AS FINISH_TIME,
+        A.STATUS,
+        CASE
+        WHEN A.STATUS = '1' THEN '已发送'
+        WHEN A.STATUS = '2' THEN '已接收'
+        WHEN A.STATUS = '3' THEN '正在执行'
+        WHEN A.STATUS = '4' THEN '执行成功'
+        WHEN A.STATUS = '5' THEN '执行失败'
+        END
+        AS STATUS_NAME,
+        CASE
+        WHEN a.controlmsg = 'PAUSESERVICE' THEN '暂停服务'
+        WHEN a.controlmsg = 'RECOVERSERVICE' THEN '恢复服务'
+        WHEN a.controlmsg = 'REBOOT' THEN '设备重启'
+        WHEN a.controlmsg = 'SHUTDOWN' THEN '设备关机'
+        WHEN a.controlmsg = 'RESETDEVICE' THEN '外设复位'
+        WHEN a.controlmsg = 'MANUALACCOUNTCHECK' THEN '手工对账'
+        WHEN INSTR(a.controlmsg,'GETLOG') > 0 THEN '日志获取'
+        WHEN INSTR(a.controlmsg,'GETPIC') > 0 THEN '屏幕截图'
+        END
+        AS CONTROLNAME,
+        A.CONTROLMSG
+        FROM TL9_QU_REMOTE_CONTROL_LOG A
+        LEFT JOIN
+        TL9_SM_BRANCH_DEVICE C
+        ON A.MAC = C.MAC
+        LEFT JOIN
+        TL9_DEVICE_CLASS D
+        ON D.DEVCLASSKEY = C.DEVCLASSKEY
+        LEFT JOIN
+        TL9_USERBASIC E
+        ON E.USERID = A.USERID,
+        ( SELECT ORGID, ORGNAME_CN
+        FROM TL9_ORGBASIC
+        START WITH
+        <choose>
+            <when test="remoteOptCondition.branchId != null and remoteOptCondition.branchId != ''">
+                ORGID = #{remoteOptCondition.branchId,jdbcType=VARCHAR}
+            </when>
+            <otherwise>
+                ORGID = #{branchId,jdbcType=VARCHAR}
+            </otherwise>
+        </choose>
+        AND ORGSTATUSTYPEID != '0'
+        CONNECT BY PRIOR ORGID = BUSINESS_SUPERIOR AND ORGSTATUSTYPEID != '0') B
+        WHERE C.branch_no = B.ORGID
+        AND A.BEGIN_DATE &lt;= to_char(trunc(sysdate),'yyyymmdd')
+        AND A.BEGIN_DATE &gt;= to_char(trunc(sysdate-1),'yyyymmdd')
+        <if test="remoteOptCondition.deviceClassKey != null and remoteOptCondition.deviceClassKey != ''">
+            AND D.DEVCLASSKEY = #{remoteOptCondition.deviceClassKey,jdbcType=VARCHAR}
+        </if>
+        <if test="remoteOptCondition.deviceID != null and remoteOptCondition.deviceID != ''">
+            AND instr(C.DEVICEID , #{remoteOptCondition.deviceID,jdbcType=VARCHAR})>0
+        </if>
+        <if test="remoteOptCondition.operatorId != null and remoteOptCondition.operatorId != ''">
+            AND A.USERID = #{remoteOptCondition.operatorId,jdbcType=VARCHAR}
+        </if>
+        ORDER BY A.SEQ DESC
+    </select>
+    <!-- 查询单个设备远程操作记录详情 -->
+    <select id="selectRemoteInfo" resultMap="remote_opt_recode">
+          SELECT a.SEQ,
+                 a.USERID,
+                 NVL (c.USERNAME, a.userid) USERNAME,
+                 a.BEGIN_DATE,
+                 a.BEGIN_TIME,
+                 a.STATUS,
+                 CASE
+                    WHEN A.STATUS = '1' THEN '已发送'
+                    WHEN A.STATUS = '2' THEN '已接收'
+                    WHEN A.STATUS = '3' THEN '正在执行'
+                    WHEN A.STATUS = '4' THEN '执行成功'
+                    WHEN A.STATUS = '5' THEN '执行失败'
+                 END
+                    AS STATUS_NAME,
+                 CASE
+                    WHEN a.controlmsg = 'PAUSESERVICE' THEN '暂停服务'
+                    WHEN a.controlmsg = 'RECOVERSERVICE' THEN '恢复服务'
+                    WHEN a.controlmsg = 'REBOOT' THEN '设备重启'
+                    WHEN a.controlmsg = 'SHUTDOWN' THEN '设备关机'
+                    WHEN a.controlmsg = 'RESETDEVICE' THEN '外设复位'
+                    WHEN a.controlmsg = 'MANUALACCOUNTCHECK' THEN '手工对账'
+                    WHEN INSTR(a.controlmsg,'GETLOG') > 0 THEN '日志获取'
+                    WHEN INSTR(a.controlmsg,'GETPIC') > 0 THEN '屏幕截图'
+                 END
+                    AS CONTROLNAME,
+                 A.CONTROLMSG
+            FROM    TL9_QU_REMOTE_CONTROL_LOG A
+                 LEFT JOIN
+                    TL9_USERBASIC c
+                 ON a.userid = c.userid
+           WHERE A.MAC = #{deviceMac,jdbcType=VARCHAR}
+              AND A.BEGIN_DATE &lt;= to_char(trunc(sysdate),'yyyymmdd')
+              AND A.BEGIN_DATE &gt;= to_char(trunc(sysdate-1),'yyyymmdd')
+        ORDER BY a.SEQ DESC
+    </select>
+
+    <!-- 根据机构号查询其下属所有操作人员信息(排除虚拟柜员) -->
+    <select id="selectOperatorsByBranchId" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.Operator">
+        SELECT U.USERID AS userId,NVL (u.USERNAME, u.USERID) as userName
+          FROM tl9_userbasic u
+         WHERE u.USERTYPEID = 'A'
+              AND u.ORGID IN
+                  (    SELECT ORGID
+                         FROM tl9_orgbasic t
+                   START WITH t.ORGID = #{branchId,jdbcType=VARCHAR} AND t.ORGSTATUSTYPEID != '0'
+                   CONNECT BY t.BUSINESS_SUPERIOR = PRIOR t.ORGID
+                              AND t.ORGSTATUSTYPEID != '0')
+    </select>
+    <!-- 根据mac查询监控外设详情信息 -->
+    <select id="selectPeripheralDetails" resultMap="peripheral_status">
+          SELECT C.DEVCLASSKEY,
+                 C.DEVCLASSNAME,
+                 CASE
+                    WHEN E.STATUS = '1' THEN '正常'
+                    WHEN E.STATUS = '2' THEN '告警'
+                    WHEN E.STATUS = '3' THEN '异常'
+                 END AS DEVICE_STATUS,
+                 T.DETAIL_DESC AS DETAIL
+            FROM TL9_SM_BRANCH_DEVICE D,
+                          TL9_TERMINAL_DEVICE_BIND A
+                       LEFT JOIN
+                          TL9_TERMINAL_MAC M
+                       ON M.TERMINALID = A.TERMINALID
+                    LEFT JOIN
+                       MAS_DEVICE_INFO E
+                    ON E.DEVMODELKEY = A.DEVMODELKEY AND E.MAC = M.MAC
+                 LEFT JOIN
+                    MAS_DEVICE_DETAIL T
+                 ON E.SEQ_NO = T.SEQ_NO
+              LEFT JOIN
+                 TL9_DEVICE_MODEL_CLASS O
+              ON O.DEVMODELKEY = A.DEVMODELKEY
+            LEFT JOIN
+              TL9_DEVICE_CLASS C
+            ON C.DEVCLASSKEY = O.DEVCLASSKEY
+           WHERE     A.TERMINALID = D.TERMINALID
+                 AND D.STATUS = '1'
+                 AND D.MAC = #{deviceMac,jdbcType=VARCHAR}
+        ORDER BY E.STATUS DESC NULLS LAST
+    </select>
+
+    <select id="selectBranchSummaryInfo" parameterType="string" resultType="com.dcfs.smartaibank.manager.monitor.web.domian.DeviceClassCount">
+        select count(case when c.DEVCLASSKEY = '100000' then 1 end)  as queueCount ,
+        count(case when c.DEVCLASSKEY = '110000' then 1 end)  as fillerCount,
+        count(case when c.DEVCLASSKEY = '120000' then 1 end)  as atmCount,
+        count(case when c.DEVCLASSKEY = '130000' then 1 end)  as stmCount,
+        count(case when c.DEVCLASSKEY = '667' then 1 end)  as bsrCount
+        from MAS_MCLASS_MONITOR m,TL9_SM_BRANCH_DEVICE c,
+        TL9_DEVICE_CLASS d,
+        MAS_DEVICE_INFO_SUM dev
+        where  m.ACTIVE = 1 and dev.MID=c.DEVICEID
+        AND c.STATUS='1'
+        AND m.MCLASSKEY=d.DEVCLASSKEY
+        AND c.DEVCLASSKEY = d.DEVCLASSKEY
+        <if test="flag != null and flag != ''">
+            AND c.BRANCH_NO = #{branchId}
+        </if>
+        <if test="flag == null or flag == ''">
+            AND c.BRANCH_NO in
+            (SELECT orgid from tl9_orgbasic WHERE orgstatustypeid != '0'
+            start WITH orgid = #{branchId} CONNECT BY BUSINESS_SUPERIOR = PRIOR orgid)
+        </if>
+    </select>
+    <select id="selectBranchDetailInfo"
+            resultMap="device_detail">
+        SELECT bb.MAC,
+        bb.BRANCH_NO,
+        bb.MID,
+        bb.MNAME,
+        bb.MMODELKEY,
+        bb.MCLASSKEY,
+        bb.MCLASSNAME,
+        bb.FIELD_NO,
+        bb.FIELD_NAME,
+        bb.M_STATUS,
+        CASE
+        WHEN bb.M_STATUS = '0' THEN '未监控'
+        WHEN bb.M_STATUS = '1' THEN '正常'
+        WHEN bb.M_STATUS = '2' THEN '应用未启动'
+        WHEN bb.M_STATUS = '3' THEN '告警'
+        WHEN bb.M_STATUS = '4' THEN '外设故障'
+        WHEN bb.M_STATUS = '5' THEN '通讯故障'
+        END AS STATUS_DESC,
+        bb.MANUF_ID,
+        bb.MANUF_NAME,
+        bb.RECEIVE_TIME,
+        bb.BRANCH_NAME,
+        bb.MTYPEKEY,
+        bb.MTYPENAME,
+        bb.NETWORK_STATUS,
+        bb.APP_STATUS,
+        bb.PERIPHERAL_STATUS,
+        CASE
+        WHEN bb.NETWORK_STATUS = '1' THEN '正常'
+        WHEN bb.NETWORK_STATUS = '2' THEN '告警'
+        WHEN bb.NETWORK_STATUS = '3' THEN '异常'
+        END AS NETWORK_STATUS_DESC,
+        CASE
+        WHEN bb.APP_STATUS = '1' THEN '正常'
+        WHEN bb.APP_STATUS = '2' THEN '告警'
+        WHEN bb.APP_STATUS = '3' THEN '异常'
+        END AS APP_STATUS_DESC,
+        CASE
+        WHEN bb.PERIPHERAL_STATUS = '1' THEN '正常'
+        WHEN bb.PERIPHERAL_STATUS = '2' THEN '告警'
+        WHEN bb.PERIPHERAL_STATUS = '3' THEN '异常'
+        END AS PERIPHERAL_STATUS_DESC,
+        to_char(bb.NETWORK_TIME,'HH24:mi:ss') as NETWORK_TIME,
+        to_char(bb.APP_TIME,'HH24:mi:ss') as APP_TIME,
+        to_char(bb.PERIPHERAL_TIME,'HH24:mi:ss') as PERIPHERAL_TIME,
+        E.DEVCLASSNAME,
+        CASE WHEN E.STATUS = '1' THEN '正常'
+        WHEN E.STATUS = '2' THEN '告警'
+        WHEN E.STATUS = '3' THEN '异常'
+        END AS DEVICE_STATUS,
+        T.DETAIL_DESC AS DETAIL,
+        dd.IP
+        FROM MAS_DEVICE_INFO_SUM bb, TL9_SM_BRANCH_DEVICE dd
+        LEFT JOIN TL9_TERMINAL_DEVICE_BIND A on A.TERMINALID = dd.TERMINALID
+        LEFT JOIN TL9_TERMINAL_MAC M ON M.TERMINALID = A.TERMINALID
+        LEFT JOIN MAS_DEVICE_INFO E ON E.DEVMODELKEY = A.DEVMODELKEY AND E.MAC = M.MAC
+        LEFT JOIN MAS_DEVICE_DETAIL T ON E.SEQ_NO = T.SEQ_NO, MAS_MCLASS_MONITOR mm
+        WHERE mm.ACTIVE = 1
+        AND dd.STATUS = '1'
+        AND bb.MID = dd.DEVICEID
+        AND mm.MCLASSKEY = dd.DEVCLASSKEY
+        AND bb.BRANCH_NO = #{branchId}
+        <if test="devClassKey!=null and devClassKey!=''">
+            and dd.DEVCLASSKEY = #{devClassKey}
+        </if>
+        ORDER BY MID
+    </select>
+</mapper>

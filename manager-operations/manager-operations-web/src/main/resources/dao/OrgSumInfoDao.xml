@@ -1,0 +1,1252 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.OrgSumInfoDao">
+    <sql id="max_values">
+        LEFT JOIN (
+		SELECT
+			MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+			MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+			MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+			MAX( WAIT_TIME_AVG )   AS MAX_WAIT_TIME_AVG
+    </sql>
+    <sql id="_branchStatsType_where">
+        <if test="branchStatsType!=0">
+            AND T.BRANCH_STATS_TYPE = #{branchStatsType}
+        </if>
+    </sql>
+    <sql id="_unio_where">
+      <if test="branchStatsType == 1">
+        AND 1!=1
+      </if>
+    </sql>
+    <!-- 查询4级机构最大值（不包含预约购买登记数）sql-->
+    <select id="getMaxFromLevel4" parameterType="java.util.Map" resultType="java.util.Map">
+        <if test=" dateType=='day'">
+          SELECT
+                MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+                ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+                ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+                ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+                (
+                    SELECT
+                        MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+                        MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+                        MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+                        MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+                    FROM
+                        SB_STATS_GATHER_D
+                    WHERE
+                        UNIT_LEVEL = '4'
+                        AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+                UNION SELECT
+                        MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+                        MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+                        MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+                        MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+                    FROM
+                        SB_STATS_GATHER_D
+                    WHERE
+                        BRANCH_NO = UNIT_NO
+                        AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+                ) M
+        </if>
+        <if test=" dateType=='month'">
+            SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            (
+            SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_YM = #{timeValue}
+            UNION SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_YM = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            (
+            SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_QUARTER = #{timeValue}
+            UNION SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_QUARTER = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='year'">
+            SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            (
+            SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_YEAR = #{timeValue}
+            UNION SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_YEAR = #{timeValue}
+            ) M
+        </if>
+    </select>
+    <!-- 查询4级机构预约登记数最大值 -->
+    <select id="getMaxFromReserve4" parameterType="java.util.Map" resultType="java.util.Map">
+        <if test=" dateType=='day'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            ) M
+        </if>
+        <if test=" dateType=='month'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_M
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_YM = #{timeValue}
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_M
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_YM = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Q
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_QUARTER = #{timeValue}
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Q
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_QUARTER = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='year'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Y
+            WHERE
+            UNIT_LEVEL = '4'
+            AND TRADE_YEAR = #{timeValue}
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Y
+            WHERE
+            BRANCH_NO = UNIT_NO
+            AND TRADE_YEAR = #{timeValue}
+            ) M
+        </if>
+    </select>
+    <!-- 查询3级机构最大值，不包含预约购买登记数 -->
+    <select id="getMaxFromLevel3" parameterType="java.util.Map" resultType="java.util.Map">
+        <if test=" dateType=='day'">
+        SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+        FROM
+            (
+                SELECT
+                    MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+                    MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+                    MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+                    MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+                FROM
+                    SB_STATS_GATHER_D
+                WHERE
+                    UNIT_LEVEL = '3'
+                    AND BRANCH_STATS_TYPE = 2
+                    AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            UNION SELECT
+                    MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+                    MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+                    MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+                    MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+                FROM
+                    SB_STATS_GATHER_D
+                WHERE
+                    UNIT_LEVEL = '3'
+                    AND BRANCH_STATS_TYPE = 1
+                    AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+                    AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            ) M
+        </if>
+        <if test=" dateType=='month'">
+            SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            (
+            SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_YM = #{timeValue}
+            UNION SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_YM = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            (
+            SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_QUARTER = #{timeValue}
+            UNION SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_QUARTER = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='year'">
+            SELECT
+            MAX(M.MAX_RECEIVE) AS MAX_RECEIVE,
+            ROUND( MAX(M.MAX_NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(M.MAX_HANDLE_TIME_AVG), 2 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(M.MAX_WAIT_TIME_AVG), 2 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            (
+            SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_YEAR = #{timeValue}
+            UNION SELECT
+            MAX( RECEIVE_COUNT ) AS MAX_RECEIVE,
+            MAX( NEGATIVE_RATE ) AS MAX_NEGATIVE_RATE,
+            MAX( HANDLE_TIME_AVG ) AS MAX_HANDLE_TIME_AVG,
+            MAX( WAIT_TIME_AVG ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_YEAR = #{timeValue}
+            ) M
+        </if>
+    </select>
+    <!-- 查询3级机构预约购买登记数的最大值 -->
+    <select id="getMaxFromReserve3" parameterType="java.util.Map" resultType="java.util.Map">
+        <if test=" dateType=='day'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            ) M
+        </if>
+        <if test=" dateType=='month'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_M
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_YM = #{timeValue}
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_M
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_YM = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Q
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_QUARTER = #{timeValue}
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Q
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_QUARTER = #{timeValue}
+            ) M
+        </if>
+        <if test=" dateType=='year'">
+            SELECT
+            MAX(M.MAX_RESERVE_REG) AS MAXRESERVECOUNT
+            FROM
+            (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Y
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 2
+            AND TRADE_YEAR = #{timeValue}
+            UNION SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_Y
+            WHERE
+            UNIT_LEVEL = '3'
+            AND BRANCH_STATS_TYPE = 1
+            AND BRANCH_NO <![CDATA[ <> ]]> UNIT_NO
+            AND TRADE_YEAR = #{timeValue}
+            ) M
+        </if>
+    </select>
+    <!-- 总行分行最大值查询 不包含预约购买登记数  -->
+    <select id="getMaxFromLevel" parameterType="java.util.Map" resultType="java.util.Map">
+        <if test=" dateType=='day'">
+        SELECT
+			MAX(RECEIVE_COUNT) AS MAX_RECEIVE,
+			ROUND( MAX(NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+			ROUND( MAX(HANDLE_TIME_AVG), 4 ) AS MAX_HANDLE_TIME_AVG,
+			ROUND( MAX(WAIT_TIME_AVG), 4 ) AS MAX_WAIT_TIME_AVG
+		FROM
+			SB_STATS_GATHER_D
+		WHERE
+			TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_D
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+        <if test=" dateType=='month'">
+            SELECT
+            MAX(RECEIVE_COUNT) AS MAX_RECEIVE,
+            ROUND( MAX(NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(HANDLE_TIME_AVG), 4 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(WAIT_TIME_AVG), 4 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            TRADE_YM = #{timeValue}
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT
+            MAX(RECEIVE_COUNT) AS MAX_RECEIVE,
+            ROUND( MAX(NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(HANDLE_TIME_AVG), 4 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(WAIT_TIME_AVG), 4 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            TRADE_QUARTER = #{timeValue}
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+        <if test=" dateType=='year'">
+            SELECT
+            MAX(RECEIVE_COUNT) AS MAX_RECEIVE,
+            ROUND( MAX(NEGATIVE_RATE), 4 ) AS MAX_NEGATIVE_RATE,
+            ROUND( MAX(HANDLE_TIME_AVG), 4 ) AS MAX_HANDLE_TIME_AVG,
+            ROUND( MAX(WAIT_TIME_AVG), 4 ) AS MAX_WAIT_TIME_AVG
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            TRADE_YEAR = #{timeValue}
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+    </select>
+    <!-- 总行分行预约购买登记数最大值查询 -->
+    <select id="getMaxFromReserve" parameterType="java.util.Map" resultType="java.util.Map">
+        <if test=" dateType=='day'">
+            SELECT
+            MAX(RESERVE_REG_COUNT) AS MAXRESERVECOUNT
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+        <if test=" dateType=='month'">
+            SELECT
+            MAX(RESERVE_REG_COUNT) AS MAXRESERVECOUNT
+            FROM
+            SB_STATS_MKT_M
+            WHERE
+            TRADE_YM = #{timeValue}
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_MKT_M
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT
+            MAX(RESERVE_REG_COUNT) AS MAXRESERVECOUNT
+            FROM
+            SB_STATS_MKT_Q
+            WHERE
+            TRADE_QUARTER = #{timeValue}
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_MKT_Q
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+        <if test=" dateType=='year'">
+            SELECT
+            MAX(RESERVE_REG_COUNT) AS MAXRESERVECOUNT
+            FROM
+            SB_STATS_MKT_Y
+            WHERE
+            TRADE_YEAR = #{timeValue}
+            AND UNIT_LEVEL IN  (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_MKT_Y
+            WHERE
+            BRANCH_NO = #{orgid} )
+        </if>
+    </select>
+
+    <select id="getOrgLevel" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT distinct t.UNIT_LEVEL AS UNITLEVEL FROM SB_STATS_GATHER_D t WHERE t.BRANCH_NO = #{orgid}
+    </select>
+
+    <select id="getOrgSumInfo" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT T.RECEIVE_COUNT,
+        round(T.RECEIVE_COUNT_T_AVG,2) as RECEIVE_COUNT_T_AVG,
+        round(T.RECEIVE_COUNT_RING,4) as RECEIVE_COUNT_RING,
+        round(T.NEGATIVE_RATE,4) as NEGATIVE_RATE ,
+        round(T.NEGATIVE_RATE_T_AVG,4) as NEGATIVE_RATE_T_AVG,
+        round(T.NEGATIVE_RATE_RING,4) as NEGATIVE_RATE_RING,
+        round(T.NEGATIVE_RATE_RING,4) as NEGATIVE_RATE_RING,
+        round(T.HANDLE_TIME_AVG,2) as HANDLE_TIME_AVG,
+        round(T.HANDLE_TIME_T_AVG,2) as HANDLE_TIME_T_AVG,
+        round(T.HANDLE_TIME_RING,4) as HANDLE_TIME_RING,
+        round(T.WAIT_TIME_AVG,2) as WAIT_TIME_AVG,
+        round(T.WAIT_TIME_T_AVG,2) as WAIT_TIME_T_AVG,
+        round(T.WAIT_TIME_AVG_RING,4) as WAIT_TIME_AVG_RING,
+        M.MAX_RECEIVE AS MAX_RECEIVE,
+        ROUND(M.MAX_NEGATIVE_RATE,4) AS MAX_NEGATIVE_RATE,
+        ROUND(M.MAX_HANDLE_TIME_AVG,2) AS MAX_HANDLE_TIME_AVG,
+        ROUND(M.MAX_WAIT_TIME_AVG,2) AS MAX_WAIT_TIME_AVG
+        <if test=" dateType=='day'">
+            FROM SB_STATS_GATHER_D T
+            <include refid="max_values"/>
+            FROM
+            SB_STATS_GATHER_D t
+            WHERE
+            t.UNIT_LEVEL IN (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_D
+            WHERE
+            BRANCH_NO = #{orgid}
+            )
+            ) M ON
+            1 = 1
+            WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test=" dateType=='month'">
+            FROM SB_STATS_GATHER_M T
+            <include refid="max_values"/>
+            FROM
+            SB_STATS_GATHER_M t
+            WHERE
+            t.UNIT_LEVEL IN (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_M
+            WHERE
+            BRANCH_NO = #{orgid}
+            )
+            ) M ON
+            1 = 1
+            WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YM = #{timeValue}
+        </if>
+        <if test=" dateType=='quarter'">
+            FROM SB_STATS_GATHER_Q T
+            <include refid="max_values"/>
+            FROM
+            SB_STATS_GATHER_Q t
+            WHERE
+            t.UNIT_LEVEL IN (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_Q
+            WHERE
+            BRANCH_NO = #{orgid}
+            )
+            ) M ON
+            1 = 1
+            WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_QUARTER = #{timeValue}
+        </if>
+        <if test=" dateType=='year'">
+            FROM SB_STATS_GATHER_Y T
+            <include refid="max_values"/>
+            FROM
+            SB_STATS_GATHER_Y t
+            WHERE
+            t.UNIT_LEVEL IN (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_GATHER_Y
+            WHERE
+            BRANCH_NO = #{orgid}
+            )
+            ) M ON
+            1 = 1
+            WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YEAR = #{timeValue}
+        </if>
+        <include refid="_branchStatsType_where"></include>
+    </select>
+    <select id="getServiceQualityTop5" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test=" dateType=='day'">
+            SELECT branchNo, branchName,value ,rate FROM
+            (SELECT
+            T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.NEGATIVE_RATE,4) AS value,
+            round(T.NEGATIVE_RATE_T_AVG,4) as avgValue,
+            round(T.NEGATIVE_RATE_RING,4) as rate,
+            rownum
+            FROM SB_STATS_GATHER_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            AND T.QUEUE_COUNT is not null
+            <if test="sortType=='DESC'">
+                ORDER BY T.NEGATIVE_RATE DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.NEGATIVE_RATE asc
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test=" dateType=='month'">
+            SELECT branchNo, branchName,value ,rate FROM
+            (SELECT
+            T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.NEGATIVE_RATE,4) AS value,
+            round(T.NEGATIVE_RATE_T_AVG,4) as avgValue,
+            round(T.NEGATIVE_RATE_RING,4) as rate,
+            rownum
+            FROM SB_STATS_GATHER_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+			AND T.QUEUE_COUNT is not null
+            <if test="sortType=='DESC'">
+                ORDER BY T.NEGATIVE_RATE DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.NEGATIVE_RATE asc
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT branchNo, branchName,value ,rate FROM
+            (SELECT
+            T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.NEGATIVE_RATE,4) AS value,
+            round(T.NEGATIVE_RATE_T_AVG,4) as avgValue,
+            round(T.NEGATIVE_RATE_RING,4) as rate,
+            rownum
+            FROM SB_STATS_GATHER_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_QUARTER = #{timeValue}
+			AND T.QUEUE_COUNT is not null
+            <if test="sortType=='DESC'">
+                ORDER BY T.NEGATIVE_RATE DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.NEGATIVE_RATE asc
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test=" dateType=='year'">
+            SELECT branchNo, branchName,value,rate FROM
+            (SELECT
+            T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.NEGATIVE_RATE,4) AS value,
+            round(T.NEGATIVE_RATE_T_AVG,4) as avgValue,
+            round(T.NEGATIVE_RATE_RING,4) as rate,
+            rownum
+            FROM SB_STATS_GATHER_Y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YEAR = #{timeValue}
+			AND T.QUEUE_COUNT is not null
+            <if test="sortType=='DESC'">
+                ORDER BY T.NEGATIVE_RATE DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.NEGATIVE_RATE asc
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <include refid="_unio_where"></include>
+    </select>
+    <select id="getAvgWaiteTime" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.SumItemInfoDomain">
+        SELECT round(T.WAIT_TIME_AVG ,2) AS avgWaitTime,
+        round(T.WAIT_TIME_T_AVG ,2) AS avgValue,
+        round(T.WAIT_TIME_AVG_RING,4) AS rate
+        <if test=" dateType=='day'">
+            FROM SB_STATS_GATHER_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10)) AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType=='month'">
+            FROM SB_STATS_GATHER_M T WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType=='quarter'">
+            FROM SB_STATS_GATHER_Q T WHERE T.TRADE_QUARTER = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test=" dateType=='year'">
+            FROM SB_STATS_GATHER_Y T WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="_branchStatsType_where"></include>
+    </select>
+    <select id="getAvgWaiteTimeTop5" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test=" dateType=='day'">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.WAIT_TIME_AVG_RING,4) as rate,
+            round(T.WAIT_TIME_AVG,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_D T
+            WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            AND T.UNIT_NO = #{orgid}
+            AND T.QUEUE_COUNT IS NOT NULL
+            <if test="sortType=='ASC'">
+                ORDER BY T.WAIT_TIME_AVG DESC
+            </if>
+            <if test="sortType=='DESC'">
+                ORDER BY T.WAIT_TIME_AVG ASC
+            </if>
+            )
+            WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test=" dateType=='month'">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT
+            T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.WAIT_TIME_AVG_RING,4) as rate,
+            round(T.WAIT_TIME_AVG,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_m T
+            WHERE T.TRADE_YM = #{timeValue}
+            AND T.UNIT_NO = #{orgid}
+			AND T.QUEUE_COUNT IS NOT NULL
+            <if test="sortType=='ASC'">
+                ORDER BY T.WAIT_TIME_AVG DESC
+            </if>
+            <if test="sortType=='DESC'">
+                ORDER BY T.WAIT_TIME_AVG ASC
+            </if>
+            )
+            WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test=" dateType=='quarter'">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO AS branchNo,
+            round(T.WAIT_TIME_AVG_RING ,4) as rate,
+            T.BRANCH_NAME AS branchName,
+            round(T.WAIT_TIME_AVG,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_Q T
+            WHERE T.TRADE_quarter = #{timeValue}
+            AND T.UNIT_NO = #{orgid}
+			AND T.QUEUE_COUNT IS NOT NULL
+            <if test="sortType=='ASC'">
+                ORDER BY T.WAIT_TIME_AVG DESC
+            </if>
+            <if test="sortType=='DESC'">
+                ORDER BY T.WAIT_TIME_AVG ASC
+            </if>
+            )
+            WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test=" dateType=='year'">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO AS branchNo,
+            T.BRANCH_NAME AS branchName,
+            round(T.WAIT_TIME_AVG_RING,4) as rate,
+            round(T.WAIT_TIME_AVG,2) AS value,
+            ROWNUM
+            FROM SB_STATS_GATHER_y T
+            WHERE T.TRADE_year = #{timeValue}
+            AND T.UNIT_NO = #{orgid}
+			AND T.QUEUE_COUNT IS NOT NULL
+            <if test="sortType=='ASC'">
+                ORDER BY T.WAIT_TIME_AVG DESC
+            </if>
+            <if test="sortType=='DESC'">
+                ORDER BY T.WAIT_TIME_AVG ASC
+            </if>
+            )
+            WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <include refid="_unio_where"></include>
+    </select>
+    <select id="getSubBranchCustFlowRank" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value,
+            round(T.RECEIVE_COUNT_T_AVG ,2) as totalAvg,
+            round(T.RECEIVE_COUNT_RING,4) as rate,
+            ROWNUM
+            FROM SB_STATS_GATHER_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value,
+            round(T.RECEIVE_COUNT_T_AVG ,2) as totalAvg,
+            round(T.RECEIVE_COUNT_RING,4) as rate,
+            ROWNUM
+            FROM SB_STATS_GATHER_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value,
+            round(T.RECEIVE_COUNT_T_AVG ,2) as totalAvg,
+            round(T.RECEIVE_COUNT_RING,4) as rate,
+            ROWNUM
+            FROM SB_STATS_GATHER_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_QUARTER = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT
+            T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            T.RECEIVE_COUNT as value,
+            round(T.RECEIVE_COUNT_T_AVG ,2) as totalAvg,
+            round(T.RECEIVE_COUNT_RING,4) as rate,
+            ROWNUM
+            FROM SB_STATS_GATHER_Y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YEAR = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RECEIVE_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RECEIVE_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <include refid="_unio_where"></include>
+    </select>
+    <select id="getSubBranSaleCustRankTop10List" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(t.mkt_c_count_ring ,4) as rate,
+            T.RESERVE_REG_COUNT as value ,
+            ROWNUM
+            FROM SB_STATS_MKT_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RESERVE_REG_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RESERVE_REG_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'month' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(t.mkt_c_count_ring ,4) as rate,
+            T.RESERVE_REG_COUNT as value ,
+            ROWNUM
+            FROM SB_STATS_MKT_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RESERVE_REG_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RESERVE_REG_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'quarter' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(t.mkt_c_count_ring ,4) as rate,
+            T.RESERVE_REG_COUNT as value ,
+            ROWNUM
+            FROM SB_STATS_MKT_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_quarter = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RESERVE_REG_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RESERVE_REG_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'year' ">
+            SELECT branchNo,branchName,value,rate
+            FROM (SELECT T.BRANCH_NO as branchNo,
+            T.BRANCH_NAME as branchName,
+            round(t.mkt_c_count_ring ,4) as rate,
+            T.RESERVE_REG_COUNT as value ,
+            ROWNUM
+            FROM SB_STATS_MKT_y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_Year = #{timeValue}
+            <if test=" sortType=='DESC'">
+                ORDER BY T.RESERVE_REG_COUNT DESC
+            </if>
+            <if test=" sortType=='ASC'">
+                ORDER BY T.RESERVE_REG_COUNT ASC
+            </if>
+            ) where ROWNUM &lt; #{rownum}
+        </if>
+        <include refid="_unio_where"></include>
+    </select>
+    <sql id="maxReserveReg">
+
+    </sql>
+    <select id="getReserveBuyCustSum" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.SumItemInfoDomain">
+        SELECT
+        T.RESERVE_REG_COUNT as reserveCount,
+        round(T.RESERVE_REG_COUNT_T_AVG,2) as avgValue,
+        round(T.RESERVE_REG_COUNT_RING ,4) as rate,
+        M.MAX_RESERVE_REG AS maxReserveCount
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_MKT_D T
+            LEFT JOIN (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_D s
+            WHERE
+            s.UNIT_LEVEL IN (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_MKT_D
+            WHERE
+            BRANCH_NO = #{orgid}
+            )
+            ) M ON 1=1
+            WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10)) AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_MKT_M T
+                LEFT JOIN (
+                SELECT
+                MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+                FROM
+                SB_STATS_MKT_M s
+                WHERE
+                s.UNIT_LEVEL IN (
+                SELECT
+                UNIT_LEVEL
+                FROM
+                SB_STATS_MKT_M
+                WHERE
+                BRANCH_NO =  #{orgid}
+                )
+                ) M ON 1=1
+            WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_MKT_q T
+                LEFT JOIN (
+                SELECT
+                MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+                FROM
+                SB_STATS_MKT_q s
+                WHERE
+                s.UNIT_LEVEL IN (
+                SELECT
+                UNIT_LEVEL
+                FROM
+                SB_STATS_MKT_q
+                WHERE
+                BRANCH_NO = #{orgid}
+                )
+                ) M ON 1=1
+            WHERE T.TRADE_quarter = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_MKT_y T
+            LEFT JOIN (
+            SELECT
+            MAX( RESERVE_REG_COUNT ) AS MAX_RESERVE_REG
+            FROM
+            SB_STATS_MKT_y s
+            WHERE
+            s.UNIT_LEVEL IN (
+            SELECT
+            UNIT_LEVEL
+            FROM
+            SB_STATS_MKT_y
+            WHERE
+            BRANCH_NO =  #{orgid}
+            )
+            ) M ON 1=1
+            WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="_branchStatsType_where"></include>
+    </select>
+    <select id="getEvaluteSumInfo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.SumItemInfoDomain">
+        SELECT T.EVALUATE_RATE as praiseRate,
+        round(T.EVALUATE_RATE_T_AVG,2) as avgValue,
+        round(T.EVALUATE_RATE_RING,4) as rate
+        <if test="dateType == 'day' ">
+            FROM SB_STATS_GATHER_D T WHERE T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10)) AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'month' ">
+            FROM SB_STATS_GATHER_M T WHERE T.TRADE_YM = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'quarter' ">
+            FROM SB_STATS_GATHER_Q T WHERE T.TRADE_QUARTER = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <if test="dateType == 'year' ">
+            FROM SB_STATS_GATHER_Y T WHERE T.TRADE_YEAR = #{timeValue} AND T.BRANCH_NO = #{orgid}
+        </if>
+        <include refid="_branchStatsType_where"></include>
+    </select>
+    <select id="getDealTimeRannkTop10List" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+        <if test="dateType == 'day' ">
+            select branchNo , branchName,value ,rate from (SELECT
+            t.branch_no AS branchNo,
+            t.branch_name AS branchName,
+            round(t.handle_time_ring,4) as rate,
+            round(t.handle_time_avg,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_D T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+            <if test="sortType=='DESC'">
+                ORDER BY T.HANDLE_TIME_AVG DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.HANDLE_TIME_AVG ASC
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'month' ">
+            select branchNo , branchName,value,rate from (SELECT
+            t.branch_no AS branchNo,
+            t.branch_name AS branchName,
+            round(t.handle_time_ring,4) as rate,
+            round(t.handle_time_avg,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_M T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YM = #{timeValue}
+            <if test="sortType=='DESC'">
+                ORDER BY T.HANDLE_TIME_AVG DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.HANDLE_TIME_AVG ASC
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'quarter' ">
+            select branchNo , branchName,value,rate from (SELECT
+            t.branch_no AS branchNo,
+            t.branch_name AS branchName,
+            round(t.handle_time_ring,4) as rate,
+            round(t.handle_time_avg,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_Q T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_QUARTER = #{timeValue}
+            <if test="sortType=='DESC'">
+                ORDER BY T.HANDLE_TIME_AVG DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.HANDLE_TIME_AVG ASC
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <if test="dateType == 'year' ">
+            select branchNo , branchName,value,rate from (SELECT
+            t.branch_no AS branchNo,
+            t.branch_name AS branchName,
+            round(t.handle_time_ring,4) as rate,
+            round(t.handle_time_avg,2) AS value, ROWNUM
+            FROM SB_STATS_GATHER_Y T
+            WHERE T.UNIT_NO = #{orgid}
+            AND T.TRADE_YEAR = #{timeValue}
+            <if test="sortType=='DESC'">
+                ORDER BY T.HANDLE_TIME_AVG DESC
+            </if>
+            <if test="sortType=='ASC'">
+                ORDER BY T.HANDLE_TIME_AVG ASC
+            </if>) WHERE ROWNUM &lt; #{rownum}
+        </if>
+        <include refid="_unio_where"></include>
+    </select>
+    <select id="getBusiEffictSumInfo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.SumItemInfoDomain">
+        SELECT
+        round(T.HANDLE_TIME_AVG,2) as avgDealTime ,
+        round(T.HANDLE_TIME_T_AVG,2) as avg,
+        round(T.HANDLE_TIME_RING,4) as rate
+        <if test=" dateType=='day'">
+            FROM SB_STATS_GATHER_D T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test=" dateType=='month'">
+            FROM SB_STATS_GATHER_M T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YM = #{timeValue}
+        </if>
+        <if test=" dateType=='quarter'">
+            FROM SB_STATS_GATHER_q T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_quarter = #{timeValue}
+        </if>
+        <if test=" dateType=='year'">
+            FROM SB_STATS_GATHER_Y T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YEAR = #{timeValue}
+        </if>
+        <include refid="_branchStatsType_where"></include>
+    </select>
+    <select id="getAvgCustFlow" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.SumItemInfoDomain">
+        SELECT
+        T.RECEIVE_COUNT AS recieveCount,
+        round(T.RECEIVE_COUNT_RING,4) AS rate,
+        round(T.RECEIVE_COUNT_T_AVG,2) AS avgValue
+        <if test=" dateType=='day'">
+            FROM SB_STATS_GATHER_D T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+        </if>
+        <if test=" dateType=='month'">
+            FROM SB_STATS_GATHER_M T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YM = #{timeValue}
+        </if>
+        <if test=" dateType=='quarter'">
+            FROM SB_STATS_GATHER_q T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_quarter = #{timeValue}
+        </if>
+        <if test=" dateType=='year'">
+            FROM SB_STATS_GATHER_Y T WHERE T.BRANCH_NO = #{orgid} AND T.TRADE_YEAR = #{timeValue}
+        </if>
+        <include refid="_branchStatsType_where"></include>
+    </select>
+</mapper>

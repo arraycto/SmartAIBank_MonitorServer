@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dcfs.smartaibank.manager.monitor.alarmurge.dao.AutoAlarmUrgeDao">
+	<select id="queryAlarmInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		 select distinct d.id as ALARM_ID,
+        case when d.ALARM_LEVEL='1'
+        then '低'
+        when d.ALARM_LEVEL='2'
+        then '中'
+        when d.ALARM_LEVEL='3'
+        then '高'
+        end as ALARM_LEVEL,
+        d.description as ALARM_DESC,
+        d.MAC,
+        d.MID,
+         case when d.M_TYPE='DEVICE'
+        then '外设故障'
+        when d.M_TYPE='APP'
+        then '应用故障'
+        when d.M_TYPE='NETWORK'
+        then '网络故障'
+        end as ALARM_LEVEL,
+        d.M_TYPE,
+        d.MMODELKEY,
+        d.MCLASSKEY,
+        d.MCLASSNAME,
+        d.BRANCH_NO,
+        tb.ORGNAME_CN  as BRANCH_NAME,
+        tbo.ORGNAME_CN as SUPER_BRANCH_NAME,
+        ma.USER_ID AS MAINTAIN_NAME,
+        tu.MOBILE AS MAINTAIN_TEL
+        from
+        mas_device_alarm_info d
+        left join tl9_orgbasic tb on tb.orgid = d.branch_no
+        left join tl9_orgbasic tbo on tbo.orgid = tb.BUSINESS_SUPERIOR
+        left join MAS_ALARM_DEAL_INFO ma on ma.ALARM_ID = d.id
+        left join tl9_userbasic tu on tu.userid = ma.USER_ID
+        WHERE
+            d.ID =#{ID}
+            AND d.ALARM_STATUS=#{ALARM_STATUS}
+	</select>
+
+	<update id="updateAlarm" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_DEVICE_ALARM_INFO
+		SET
+			ALARM_STATUS=4
+		WHERE ALARM_STATUS !=4
+		AND ID = #{ID}
+	</update>
+
+	<select id="queryBranchNoticeUsers" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+            A.USERID,
+            A.MOBILE_NO AS PHONE
+        FROM
+            TL9_USERBASIC A,
+            TL9_USERROLE B,
+            TL9_ORGBASIC C
+        WHERE
+        	A.USERID = B.USERID AND B.ROLEID='BasicRole' AND A.ORGID = C.BUSINESS_SUPERIOR AND c.ORGID = #{BRANCH_NO}
+	</select>
+
+	<select id="queryHeaderNoticeUsers" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+            A.USERID,
+            A.MOBILE_NO  AS PHONE
+        FROM
+            TL9_USERBASIC A,
+            TL9_USERROLE B,
+            TL9_ORGBASIC C
+        WHERE
+        	A.USERID = B.USERID AND B.ROLEID='BasicRole' AND A.ORGID = C.ORGID AND c.ORGLEVELID = '1'
+	</select>
+
+	<select id="getRepairManInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+            tdmm.MAINTAINERID AS USERID,
+            tdmm.MOBILE_NO  AS PHONE
+        from
+        mas_device_alarm_info d
+        left join TL9_DEVICE_MAINTENANCE tdm on tdm.DEVMODELKEY = d.MMODELKEY
+        left join TL9_DEVICE_MAINTAINER tdmm on tdm.MAINTAINERID = tdmm.MAINTAINERID
+        where d.id = #{ID}
+	</select>
+	<!-- 获取厂商任务的预计修复时间 -->
+	<select id="getRepairPlanDateInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select to_char(forecastdate, 'yyyy-MM-dd HH:mm:SS') forecastdate from MAS_REPAIR_ALARM_INFO t where status='N' and alarm_id = #{ID}
+	</select>
+
+	<update id="updateRepairPlanDateSMSstatus" parameterType="java.util.HashMap">
+		UPDATE
+			MAS_REPAIR_ALARM_INFO
+		SET
+			SMS_STATUS='2',
+			CHECKSTATUS = ''
+		WHERE
+		ALARM_ID = #{ID}
+	</update>
+</mapper>

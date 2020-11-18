@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.base.dao.RoleDao">
+
+    <resultMap id="roleInfo" type="com.dcfs.smartaibank.manager.base.domain.Role">
+        <id property="id" column="ROLEID"/>
+        <id property="systemId" column="SYSTEMID"/>
+        <result property="name" column="ROLENAME"/>
+        <result property="desc" column="ROLEDESC"/>
+        <collection property="resources" ofType="com.dcfs.smartaibank.manager.base.domain.Resource"
+                    select="queryResources" column="{id=ROLEID,systemId=SYSTEMID}">
+        </collection>
+    </resultMap>
+    <resultMap id="resource" type="com.dcfs.smartaibank.manager.base.domain.Resource">
+        <id property="id" column="RESOURCEID"/>
+        <result property="parent" column="PARENT"/>
+        <result property="name" column="RESOURCENAME"/>
+        <result property="systemId" column="SYSTEMID"/>
+        <collection property="operationMode" javaType="List"
+                    ofType="com.dcfs.smartaibank.manager.base.domain.OperationMode">
+            <id property="id" column="OPERATIONMODE"></id>
+            <result property="name" column="MODENAME"></result>
+        </collection>
+    </resultMap>
+    <resultMap id="spareData" type="com.dcfs.smartaibank.manager.base.domain.AccessSystem">
+        <collection property="systems" ofType="com.dcfs.smartaibank.manager.base.domain.SpareDataDomain">
+            <result property="key" column="SYSTEMID"></result>
+            <result property="value" column="RESOURCENAME"></result>
+        </collection>
+    </resultMap>
+    <select id="queryResources" resultMap="resource">
+          select t.RESOURCEID,t.PARENT,t.RESOURCENAME,t.SYSTEMID,m.OPERATIONMODE,d.MODENAME
+            from tl9_roleaccessresource c
+            left join tl9_resourcebasic t on c.RESOURCEID = t.RESOURCEID
+            left join TL9_ROLE_RESOURCE_MODE m on m.ROLEID = c.ROLEID and m.PARENTKEY=c.PARENTKEY and m.RESOURCEID=c.RESOURCEID and m.SYSTEMID=C.SYSTEMID
+            left join TL9_OPERATIONMODE_DESC d on d.OPERATIONMODE = m.OPERATIONMODE
+         where c.ROLEID =#{id} and c.SYSTEMID = #{systemId}
+    </select>
+    <!-- 按条件查询角色信息 -->
+    <select id="select" resultMap="roleInfo">
+        select r.ROLEID,r.ROLENAME,r.ROLEDESC,r.SYSTEMID
+        from tl9_rolebasic r
+        <where>
+            <if test="systemId != null and systemId != ''">r.SYSTEMID like '%'||#{systemId}||'%'</if>
+            <if test="id != null and id != ''">and r.ROLEID like '%'||#{id}||'%'</if>
+            <if test="name != null and name != ''">and r.ROLENAME like '%'||#{name}||'%'</if>
+        </where>
+    </select>
+    <!-- 插入角色基础信息-->
+    <insert id="insert" parameterType="com.dcfs.smartaibank.manager.base.domain.Role">
+        INSERT INTO TL9_ROLEBASIC
+            (
+                ROLEID,ROLENAME,ROLEDESC,UPDATETIME,SYSTEMID
+            )
+        VALUES(#{id},#{name},#{desc},sysdate,#{systemId})
+    </insert>
+    <!-- 插入角色对应资源信息-->
+    <insert id="insertRoleAccessSources" parameterType="com.dcfs.smartaibank.manager.base.domain.Role">
+        INSERT INTO TL9_ROLEACCESSRESOURCE
+        ( ROLEID,RESOURCEACCESSID,UPDATETIME,RESOURCEID,PARENTKEY,SYSTEMID)
+        <foreach collection="resources" item="item" index="index" separator="union all">
+            select #{id},'O',sysdate,#{item.id},
+            decode(#{item.parent,jdbcType=VARCHAR},null,'TOP','','TOP',#{item.parent,jdbcType=VARCHAR}),#{item.systemId}
+            from dual
+        </foreach>
+    </insert>
+    <!-- 获取用户的角色数量-->
+    <select id="getUserRoleCount" resultType="int">
+        select count(1)
+        from TL9_USERROLE c
+        where c.roleid =#{roleId} and c.systemid = #{systemId}
+    </select>
+    <!-- 删除角色对应资源信息-->
+    <delete id="deleteRoleAccessSources">
+        DELETE FROM TL9_ROLEACCESSRESOURCE
+            WHERE ROLEID =#{roleId} AND SYSTEMID =#{systemId}
+    </delete>
+    <!-- 根据主键删除角色信息（主键：系统id和角色id）-->
+    <delete id="deleteByPrimaryKey" parameterType="com.dcfs.smartaibank.manager.base.domain.RoleKey">
+        DELETE FROM TL9_ROLEBASIC
+        WHERE ROLEID =#{id.roleId} AND SYSTEMID =#{id.systemId}
+    </delete>
+    <!-- 根据主键更新角色信息（主键：系统id和角色id）-->
+    <update id="updateByPrimaryKey" parameterType="com.dcfs.smartaibank.manager.base.domain.Role">
+        UPDATE TL9_ROLEBASIC  SET ROLENAME = #{name},
+                                   ROLEDESC = #{desc},
+                                   UPDATETIME = sysdate
+              WHERE ROLEID =#{id} AND SYSTEMID =#{systemId}
+    </update>
+    <!-- 根据主键查询角色信息（主键：系统id和角色id）-->
+    <select id="selectByPrimaryKey" resultMap="roleInfo"
+            parameterType="com.dcfs.smartaibank.manager.base.domain.RoleKey">
+        select r.ROLEID,r.ROLENAME,r.ROLEDESC,r.SYSTEMID
+        from tl9_rolebasic r
+        WHERE r.SYSTEMID=#{id.systemId} AND r.ROLEID=#{id.roleId}
+    </select>
+    <!-- 插入某一个角色对应资源对应的访问方式 -->
+    <insert id="insertRoleResourceOperateMode" parameterType="com.dcfs.smartaibank.manager.base.domain.Role">
+        INSERT INTO TL9_ROLE_RESOURCE_MODE
+        ( ROLEID,RESOURCEID,PARENTKEY,SYSTEMID,OPERATIONMODE)
+        <foreach collection="resources" item="resourceItem" index="resourceIndex" separator="union all">
+            <foreach collection="resourceItem.operationMode" item="modeItem" index="modeIndex" separator="union all">
+                SELECT
+                #{id},
+                #{resourceItem.id},
+                decode(#{resourceItem.parent,jdbcType=VARCHAR},null,'TOP','','TOP',#{resourceItem.parent,jdbcType=VARCHAR}),
+                #{resourceItem.systemId},
+                #{modeItem.id}
+                FROM dual
+            </foreach>
+        </foreach>
+    </insert>
+    <delete id="deleteRoleResourceOperateMode" parameterType="com.dcfs.smartaibank.manager.base.domain.RoleKey">
+          DELETE FROM TL9_ROLE_RESOURCE_MODE
+        WHERE ROLEID =#{roleId} AND SYSTEMID =#{systemId}
+    </delete>
+    <!-- 根据系统id和角色名查询角色名称是否已经存在 -->
+    <select id="selectCountBySystemIdAndName" parameterType="map" resultType="int">
+        select count(1)
+        from tl9_rolebasic r
+        WHERE r.SYSTEMID=#{systemId} AND r.ROLENAME=#{roleName}
+    </select>
+    <!-- 根据用户id查询该用户可管理的所有系统 -->
+    <select id="selectAccessSystemByUserId" parameterType="string" resultMap="spareData">
+        SELECT b.SYSTEMID, b.RESOURCENAME
+          FROM tl9_resourcebasic b
+         WHERE (b.RESOURCEID, b.SYSTEMID) IN
+                  (SELECT DISTINCT r.RESOURCEID, r.SYSTEMID
+                     FROM TL9_ROLEACCESSRESOURCE r
+                    WHERE (r.ROLEID, r.SYSTEMID) IN (SELECT u.ROLEID, u.SYSTEMID
+                                                       FROM tl9_userrole u
+                                                      WHERE u.USERID = #{userId})
+                          AND r.PARENTKEY = 'TOP')
+    </select>
+</mapper>

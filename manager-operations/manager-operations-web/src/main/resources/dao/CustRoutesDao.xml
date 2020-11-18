@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.CustRoutesDao">
+    <select id="getCustRoutesDetailInfo" parameterType="java.util.Map" resultType="com.dcfs.smartaibank.manager.operations.web.domain.CustRoutesDomain">
+
+              SELECT  T.CUST_ROUTES as custRoutes, T.ROUTES_COUNT  as routesCount
+         <if test="dateType=='day'">
+              FROM SB_STATS_ROUTES_D T   WHERE  T.BRANCH_NO=#{orgid}   AND T.TRADE_DATE = to_number(SUBSTR(#{timeValue}, 10))
+			 ORDER BY T.ROUTES_COUNT DESC
+          </if>
+        <if test="dateType=='month'">
+            FROM SB_STATS_ROUTES_M t     WHERE  T.BRANCH_NO=#{orgid}  AND T.TRADE_YM=#{timeValue}    ORDER BY T.ROUTES_COUNT DESC
+        </if>
+        <if test="dateType=='quarter'">
+            FROM SB_STATS_ROUTES_Q T    WHERE T.BRANCH_NO=#{orgid}  AND T.TRADE_QUARTER=#{timeValue}  ORDER BY T.ROUTES_COUNT DESC
+        </if>
+        <if test="dateType=='year'">
+            FROM SB_STATS_ROUTES_y T  WHERE T.BRANCH_NO=#{orgid} AND T.TRADE_year=#{timeValue} ORDER BY T.ROUTES_COUNT DESC
+        </if>
+    </select>
+</mapper>

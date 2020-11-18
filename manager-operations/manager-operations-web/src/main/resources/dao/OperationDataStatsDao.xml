@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.OperationDataStatsDao">
+    <select id="hallMarketStats" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_hallmarket(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="hallMarketUserStats" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_hallmarket_user(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="custRouteStats" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_cust_routes(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+
+    <select id="cusFlowByAge" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_cusflow_age(
+        #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+        }
+    </select>
+    <select id="cusFlowByAsset" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_CUSFLOW_ASSET(
+        #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+        }
+    </select>
+    <select id="cusFlowBySex" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_cusflow_sex(
+        #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+        }
+    </select>
+    <select id="cusFlowByTime" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_cusflow_time(
+        #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+        }
+    </select>
+    <select id="busEffic" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_effic(
+        #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+        }
+    </select>
+    <select id="busEfficTran" statementType="CALLABLE" parameterType="java.lang.String">
+        {call sb_stats_effic_tran(
+        #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN},#{superiorDate,jdbcType=VARCHAR,mode=IN})
+        }
+    </select>
+    <select id="orgGather" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_ORG_GATHER(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="userGather" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_USER_GATHER(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="userTrans" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_USER_TRANS(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="queueByCust" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_QUEUE_CUST(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="queueByTimeStep" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_QUEUE_TIME_STEP(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <select id="queueByTimeGroup" statementType="CALLABLE" parameterType="java.lang.String">
+        {call SB_STATS_QUEUE_TIME_GROUP(
+                #{dateType,jdbcType=VARCHAR,mode=IN},#{date,jdbcType=VARCHAR,mode=IN})
+            }
+    </select>
+    <delete id="deleteTradeDataByDate" parameterType="java.lang.String">
+		 truncate table TEMP_TRADE_INFO
+    </delete>
+
+
+</mapper>

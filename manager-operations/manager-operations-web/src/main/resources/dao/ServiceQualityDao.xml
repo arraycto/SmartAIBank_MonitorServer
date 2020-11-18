@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.dcfs.smartaibank.manager.operations.web.dao.ServiceQualityDao">
+	<!--日月季年补零select片段-->
+	<sql id="selectByZero">
+      SELECT time,
+       VALUE,
+       totalAvg,
+       NVL (
+          rate,
+          CASE
+             WHEN LAG (VALUE, 1) OVER (ORDER BY time) != 0 THEN -1
+             ELSE rate
+          END)
+          AS rate
+        FROM (
+        SELECT a.timelist AS time,
+           NVL (b.VALUE, 0) AS VALUE,
+           b.totalAvg AS totalAvg,
+           b.rate AS rate
+        FROM
+    </sql>
+	<sql id="selectForCompletionData">
+		<if test=" dateType == 'day'">
+			(SELECT TO_CHAR (TO_DATE (SUBSTR(#{timeValue}, 10), 'yyyyMMDD') -
+			(to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 ,8), 'yyyyMMDD' )+2)+ ROWNUM,
+			'yyyyMMDD')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= to_date( SUBSTR(#{timeValue}, 10), 'yyyyMMDD' ) - to_date( SUBSTR(#{timeValue}, 1 , 8), 'yyyyMMDD' )+2) a
+		</if>
+		<if test=" dateType == 'month'">
+			(SELECT TO_CHAR (
+			ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 13),
+			ROWNUM),
+			'yyyyMM')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 13) a
+		</if>
+		<if test=" dateType == 'quarter'">
+			(SELECT TO_CHAR (
+			ADD_MONTHS (ADD_MONTHS (TO_DATE (#{timeValue}, 'yyyyMM'), -1 * 15),
+			3 * ROWNUM),
+			'yyyyMM')
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 5) a
+		</if>
+		<if test=" dateType == 'year'">
+			(SELECT TO_CHAR (#{timeValue} - 4 + ROWNUM)
+			AS timelist
+			FROM DUAL
+			CONNECT BY ROWNUM &lt;= 4) a
+		</if>
+	</sql>
+	<!--日月季年重复使用可回滚前片段-->
+	<sql id="sqlByZeroBefore">
+        left join (
+    </sql>
+	<!--日月季年重复使用可回滚后片段-->
+	<sql id="sqlByZeroAfter">
+        ) b
+    </sql>
+	<!--日月季年补零where片段-->
+	<sql id="whereByLeftJoin">
+        ON a.timelist = b.TIME
+            ORDER BY
+        a.timelist)
+    </sql>
+	<sql id="_branchStatsType_where">
+		<if test="branchStatsType!=0">
+			AND T.BRANCH_STATS_TYPE = #{branchStatsType}
+		</if>
+	</sql>
+	<sql id="_unio_where">
+		<if test="branchStatsType == 1">
+			AND 1!=1
+		</if>
+	</sql>
+	<select id="getServiceQualityType"
+			resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistriAndCtDomain">
+		SELECT distinct
+		<if test="qualityType=='evaluteRate'">
+			G.EVALUATE_RATE as "value",
+			G.EVALUATE_RATE_T_AVG as "totalAvg",
+			G.EVALUATE_RATE_RING as "rate"
+		</if>
+		<if test="qualityType=='praiseRate'">
+			G.POSITIVE_RATE as "value",
+			G.POSITIVE_RATE_T_AVG as "totalAvg",
+			G.POSITIVE_RATE_RING as "rate"
+		</if>
+		<if test="qualityType=='navigateRate'">
+			G.NEGATIVE_RATE as "value",
+			G.NEGATIVE_RATE_T_AVG as "totalAvg",
+			G.NEGATIVE_RATE_RING as "rate"
+		</if>
+		FROM
+		<if test="dateType=='day'">
+			SB_STATS_GATHER_D G WHERE G.TRADE_DATE = SUBSTR(#{timeValue}, 10)
+		</if>
+		<if test="dateType=='month'">
+			SB_STATS_GATHER_M G WHERE G.TRADE_YM = #{timeValue}
+		</if>
+		<if test="dateType=='quarter'">
+			SB_STATS_GATHER_Q G WHERE G.TRADE_QUARTER = #{timeValue}
+		</if>
+		<if test="dateType=='year'">
+			SB_STATS_GATHER_Y G WHERE G.TRADE_YEAR = #{timeValue}
+		</if>
+		AND G.UNIT_NO =#{orgId}
+		<include refid="_unio_where"></include>
+	</select>
+
+	<select id="getSubBranchRankTop10List"
+			resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonRankDomain">
+		SELECT t.*,rowNum as "rankNo" from (
+		SELECT
+		T.BRANCH_NO as "branchNo",
+		T.BRANCH_NAME as "branchName",
+
+		<if test="qualityType=='evaluteRate'">
+			T.EVALUATE_RATE_T_AVG as "totalVag",
+			T.EVALUATE_RATE_RING AS "rate",
+			T.EVALUATE_RATE
+		</if>
+		<if test="qualityType=='praiseRate'">
+			T.POSITIVE_RATE_T_AVG as "totalVag",
+			T.POSITIVE_RATE_RING AS "rate",
+			T.POSITIVE_RATE
+		</if>
+		<if test="qualityType=='navigateRate'">
+			T.NEGATIVE_RATE_T_AVG as "totalVag",
+			T.NEGATIVE_RATE_RING AS "rate",
+			T.NEGATIVE_RATE
+		</if>
+		as "value"
+		FROM
+		<if test="dateType=='day'">
+			SB_STATS_GATHER_D T
+			WHERE T.UNIT_NO = #{orgId}
+			AND T.TRADE_DATE  = SUBSTR(#{timeValue}, 10)
+		</if>
+		<if test="dateType=='month'">
+			SB_STATS_GATHER_M T
+			WHERE T.UNIT_NO = #{orgId}
+			AND T.TRADE_YM = #{timeValue}
+		</if>
+		<if test="dateType=='quarter'">
+			SB_STATS_GATHER_Q T
+			WHERE T.UNIT_NO = #{orgId}
+			AND T.TRADE_QUARTER = #{timeValue}
+		</if>
+		<if test="dateType=='year'">
+			SB_STATS_GATHER_Y T
+			WHERE T.UNIT_NO = #{orgId}
+			AND T.TRADE_YEAR = #{timeValue}
+		</if>
+		AND T.QUEUE_COUNT IS not NULL
+		<include refid="_unio_where"></include>
+		ORDER BY
+		<choose>
+			<when test="qualityType=='navigateRate'">
+				"value" ASC
+			</when>
+			<otherwise>
+				"value" DESC
+			</otherwise>
+		</choose>
+		) t
+		where rownum &lt;11
+	</select>
+
+	<select id="getTimeGroupServiceQualityList"
+			resultType="com.dcfs.smartaibank.manager.operations.web.domain.CommonDistributionDomain">
+		<include refid="selectByZero"/>
+		<include refid="selectForCompletionData"/>
+		<include refid="sqlByZeroBefore"/>
+		<if test="dateType=='day'">
+			select T.TRADE_DATE as time,
+			<if test="qualityType=='evaluteRate'">
+				T.EVALUATE_RATE as value,
+				T.EVALUATE_RATE_T_AVG as totalAvg,
+				T.EVALUATE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='praiseRate'">
+				T.POSITIVE_RATE as value,
+				T.POSITIVE_RATE_T_AVG as totalAvg,
+				T.POSITIVE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='navigateRate'">
+				T.NEGATIVE_RATE as value,
+				T.NEGATIVE_RATE_T_AVG as totalAvg,
+				T.NEGATIVE_RATE_RING as rate
+			</if>
+			from
+			SB_STATS_GATHER_D T
+			WHERE T.BRANCH_NO = #{orgId}
+			AND TO_DATE(T.TRADE_DATE, 'YYYYMMDD') BETWEEN ADD_MONTHS(TO_DATE(SUBSTR(#{timeValue}, 1,8), 'YYYYMMDD'),-2)  AND
+			TO_DATE(SUBSTR(#{timeValue}, 10), 'YYYYMMDD')
+			<include refid="_branchStatsType_where"></include>
+			order by time
+		</if>
+		<if test="dateType=='month'">
+			select T.TRADE_YM as time,
+			<if test="qualityType=='evaluteRate'">
+				T.EVALUATE_RATE as value,
+				T.EVALUATE_RATE_T_AVG as totalAvg,
+				T.EVALUATE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='praiseRate'">
+				T.POSITIVE_RATE as value,
+				T.POSITIVE_RATE_T_AVG as totalAvg,
+				T.POSITIVE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='navigateRate'">
+				T.NEGATIVE_RATE as value,
+				T.NEGATIVE_RATE_T_AVG as totalAvg,
+				T.NEGATIVE_RATE_RING as rate
+			</if>
+			from
+			SB_STATS_GATHER_M T
+			WHERE T.BRANCH_NO = #{orgId}
+			AND TO_DATE(T.TRADE_YM, 'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-1*13)
+			AND TO_DATE(#{timeValue}, 'YYYYMM')
+			<include refid="_branchStatsType_where"></include>
+			order by time
+		</if>
+		<if test="dateType=='quarter'">
+			select T.TRADE_QUARTER as time,
+			<if test="qualityType=='evaluteRate'">
+				T.EVALUATE_RATE as value,
+				T.EVALUATE_RATE_T_AVG as totalAvg,
+				T.EVALUATE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='praiseRate'">
+				T.POSITIVE_RATE as value,
+				T.POSITIVE_RATE_T_AVG as totalAvg,
+				T.POSITIVE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='navigateRate'">
+				T.NEGATIVE_RATE as value,
+				T.NEGATIVE_RATE_T_AVG as totalAvg,
+				T.NEGATIVE_RATE_RING as rate
+			</if>
+			from
+			SB_STATS_GATHER_Q T
+			WHERE T.BRANCH_NO = #{orgId}
+			AND TO_DATE(T.TRADE_QUARTER, 'YYYYMM') BETWEEN ADD_MONTHS(TO_DATE(#{timeValue},'YYYYMM'),-3*5)
+			AND TO_DATE(#{timeValue}, 'YYYYMM')
+			<include refid="_branchStatsType_where"></include>
+			order by time
+		</if>
+		<if test="dateType=='year'">
+			select T.TRADE_YEAR as time,
+			<if test="qualityType=='evaluteRate'">
+				T.EVALUATE_RATE as value,
+				T.EVALUATE_RATE_T_AVG as totalAvg,
+				T.EVALUATE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='praiseRate'">
+				T.POSITIVE_RATE as value,
+				T.POSITIVE_RATE_T_AVG as totalAvg,
+				T.POSITIVE_RATE_RING as rate
+			</if>
+			<if test="qualityType=='navigateRate'">
+				T.NEGATIVE_RATE as value,
+				T.NEGATIVE_RATE_T_AVG as totalAvg,
+				T.NEGATIVE_RATE_RING as rate
+			</if>
+			from
+			SB_STATS_GATHER_Y T
+			WHERE T.BRANCH_NO = #{orgId}
+			AND
+			TO_NUMBER(T.TRADE_YEAR) BETWEEN TO_NUMBER(#{timeValue})- 4
+			AND TO_NUMBER(#{timeValue})
+			<include refid="_branchStatsType_where"></include>
+			order by time
+		</if>
+		<include refid="sqlByZeroAfter"/>
+		<include refid="whereByLeftJoin"/>
+	</select>
+</mapper>
