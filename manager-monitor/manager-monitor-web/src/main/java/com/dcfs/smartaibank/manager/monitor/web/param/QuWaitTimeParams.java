@@ -22,7 +22,8 @@ import javax.validation.constraints.NotNull;
 @ToString
 public class QuWaitTimeParams {
 
-    @ApiModelProperty(value = "报表周期类型，日、月、季、年报表，[day,month,quarter,year]", required = true)
+    @ApiModelProperty(value = "报表周期类型，日、月、季、年报表，[day,month,quarter,year]",
+            required = true)
     @NotEmpty(message = "{reportType.not.empty}")
     private String reportType;
 

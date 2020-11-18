@@ -36,7 +36,8 @@ public class PeripheralFaultRateQueryParams {
     @ApiModelProperty(value = "消息类型-（外设故障详情中使用）", required = false)
     private String dataType;
 
-    @ApiModelProperty(value = "报表周期类型，日、月、季、年报表，[day,month,quarter,year]", required = true)
+    @ApiModelProperty(value = "报表周期类型，日、月、季、年报表，[day,month,quarter,year]",
+            required = true)
     @NotEmpty(message = "{reportType.not.empty}")
     private String reportType;
 

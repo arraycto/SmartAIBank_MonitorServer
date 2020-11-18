@@ -1,6 +1,6 @@
 package com.dcfs.smartaibank.manager.monitor.web.param;
 
-import com.dcfs.smartaibank.manager.monitor.web.domian.ClientFlowTimeInfo;
+
 import com.dcfs.smartaibank.springboot.core.validation.annotation.MaxWithConfig;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModelProperty;
@@ -12,7 +12,7 @@ import lombok.ToString;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
-import java.util.List;
+
 
 /**
  * @author qinfeng
